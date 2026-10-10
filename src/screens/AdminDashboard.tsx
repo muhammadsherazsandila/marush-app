@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,12 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, UserRole } from '../types';
-import { mockStore } from '../services/supabase';
+import { dataProvider, mockStore } from '../services/supabase';
 
 interface AdminDashboardProps {
   currentUser: UserProfile;
@@ -23,6 +24,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [users, setUsers] = useState<UserProfile[]>(mockStore.getUsers());
   const [programs, setPrograms] = useState<Program[]>(mockStore.getPrograms());
+  const [loading, setLoading] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Employee CRUD Modal State
   const [isEmpModalOpen, setIsEmpModalOpen] = useState(false);
@@ -31,6 +34,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   const [empEmail, setEmpEmail] = useState('');
   const [empRole, setEmpRole] = useState<UserRole>('employee');
   const [empPhone, setEmpPhone] = useState('');
+  const [empCode, setEmpCode] = useState('');
 
   // Program Detail / Inspection Modal
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
@@ -39,16 +43,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   const [approvingProgram, setApprovingProgram] = useState<Program | null>(null);
   const [selectedAuditorId, setSelectedAuditorId] = useState<string>('');
 
-  const refreshData = () => {
-    setUsers(mockStore.getUsers());
-    setPrograms(mockStore.getPrograms());
-  };
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [latestUsers, latestPrograms] = await Promise.all([
+        dataProvider.getUsers(),
+        dataProvider.getPrograms(),
+      ]);
+      setUsers(latestUsers);
+      setPrograms(latestPrograms);
+    } catch {
+      // Fallback to local store
+      setUsers(mockStore.getUsers());
+      setPrograms(mockStore.getPrograms());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const completedPrograms = programs.filter(p => p.status === 'completed');
   const activeProgramsList = programs.filter(p => p.status === 'active');
   const pendingTeamPrograms = programs.filter(p => p.status === 'pending_approval');
   const pendingUsers = users.filter(u => u.status === 'pending');
   const auditors = users.filter(u => u.role === 'program_auditor' && u.status === 'approved');
+
+  // Filtered lists for search
+  const filteredUsers = users.filter(
+    u =>
+      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.employeeCode && u.employeeCode.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const filteredCompletedPrograms = completedPrograms.filter(
+    p =>
+      p.programName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.hatcheryOrFarmName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.controllerName && p.controllerName.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   // Employee CRUD Actions
   const handleOpenAddEmp = () => {
@@ -57,6 +93,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     setEmpEmail('');
     setEmpRole('employee');
     setEmpPhone('');
+    setEmpCode(`MRSH-EMP-${Math.floor(100 + Math.random() * 900)}`);
     setIsEmpModalOpen(true);
   };
 
@@ -66,26 +103,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     setEmpEmail(emp.email);
     setEmpRole(emp.role);
     setEmpPhone(emp.phone || '');
+    setEmpCode(emp.employeeCode || '');
     setIsEmpModalOpen(true);
   };
 
-  const handleSaveEmployee = () => {
+  const handleSaveEmployee = async () => {
     if (!empFullName.trim() || !empEmail.trim()) {
       Toast.show({ type: 'error', text1: 'Validation Error', text2: 'Name and email are required.' });
       return;
     }
 
     if (editingEmp) {
-      mockStore.updateUserRole(editingEmp.id, empRole);
-      Toast.show({ type: 'success', text1: 'Updated', text2: `${empFullName} updated.` });
+      await dataProvider.updateUserRole(editingEmp.id, empRole);
+      Toast.show({ type: 'success', text1: 'Updated', text2: `${empFullName} role updated.` });
     } else {
-      mockStore.addUser({
+      await dataProvider.addUser({
         fullName: empFullName.trim(),
         email: empEmail.trim(),
         role: empRole,
         status: 'approved',
-        phone: empPhone.trim(),
-        employeeCode: `MRSH-EMP-${Math.floor(100 + Math.random() * 900)}`,
+        phone: empPhone.trim() || undefined,
+        employeeCode: empCode.trim() || `MRSH-EMP-${Math.floor(100 + Math.random() * 900)}`,
       });
       Toast.show({ type: 'success', text1: 'Employee Added', text2: `${empFullName} registered.` });
     }
@@ -94,21 +132,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     refreshData();
   };
 
-  const handleDeleteEmployee = (id: string) => {
-    mockStore.deleteUser(id);
+  const handleDeleteEmployee = async (id: string) => {
+    await dataProvider.deleteUser(id);
     Toast.show({ type: 'info', text1: 'Deleted', text2: 'Employee removed from system.' });
     refreshData();
   };
 
-  const handleApproveUser = (id: string) => {
-    mockStore.updateUserStatus(id, 'approved');
+  const handleApproveUser = async (id: string) => {
+    await dataProvider.updateUserStatus(id, 'approved');
     Toast.show({ type: 'success', text1: 'User Approved', text2: 'Account verified.' });
     refreshData();
   };
 
-  const handleRejectUser = (id: string) => {
-    mockStore.updateUserStatus(id, 'rejected');
-    Toast.show({ type: 'error', text1: 'User Rejected', text2: 'Account access denied.' });
+  const handleRejectUser = async (id: string) => {
+    await dataProvider.updateUserStatus(id, 'rejected');
+    Toast.show({ type: 'error', text1: 'User Rejected', text2: 'Account access declined.' });
     refreshData();
   };
 
@@ -120,14 +158,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     }
   };
 
-  const handleConfirmTeamApproval = () => {
+  const handleConfirmTeamApproval = async () => {
     if (!approvingProgram) return;
     if (!selectedAuditorId) {
       Toast.show({ type: 'error', text1: 'Auditor Required', text2: 'Please assign a Program Auditor.' });
       return;
     }
 
-    mockStore.approveProgramAndStart(approvingProgram.id, selectedAuditorId);
+    await dataProvider.approveProgramAndStart(approvingProgram.id, selectedAuditorId);
     Toast.show({
       type: 'success',
       text1: 'Program Approved & Started',
@@ -139,7 +177,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
 
   return (
     <View style={styles.container}>
-      {/* Tab Navigation */}
+      {/* Tab Navigation & Refresh */}
       <View style={styles.navTabs}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
           {[
@@ -152,13 +190,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
             <TouchableOpacity
               key={tab.id}
               style={[styles.tabItem, activeTab === tab.id && styles.activeTabItem]}
-              onPress={() => setActiveTab(tab.id as TabType)}
+              onPress={() => {
+                setActiveTab(tab.id as TabType);
+                setSearchQuery('');
+              }}
             >
               <Text style={[styles.tabItemText, activeTab === tab.id && styles.activeTabItemText]}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+            )}
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -263,13 +311,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
         {/* ALL PROGRAMS DONE TAB */}
         {activeTab === 'programs' && (
           <View style={styles.tabSection}>
-            <Text style={styles.sectionHeading}>Completed Programs Archive</Text>
-            {completedPrograms.length === 0 ? (
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeading}>Completed Programs Archive</Text>
+            </View>
+
+            <TextInput
+              style={styles.searchBar}
+              placeholder="Search programs by name, location, or controller..."
+              placeholderTextColor={Colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+
+            {filteredCompletedPrograms.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No completed programs yet.</Text>
+                <Text style={styles.emptyText}>No matching completed programs found.</Text>
               </View>
             ) : (
-              completedPrograms.map(prog => (
+              filteredCompletedPrograms.map(prog => (
                 <TouchableOpacity
                   key={prog.id}
                   style={styles.programCard}
@@ -285,16 +344,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                   <Text style={styles.progMeta}>
                     Controller: {prog.controllerName} • Auditor: {prog.auditorName}
                   </Text>
-                  {prog.auditScore && (
+                  {prog.auditScore ? (
                     <Text style={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
-                  )}
-                  {prog.auditorRemarks && (
+                  ) : null}
+                  {prog.auditorRemarks ? (
                     <View style={styles.remarksSnippet}>
                       <Text style={styles.remarksText} numberOfLines={2}>
                         "{prog.auditorRemarks}"
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </TouchableOpacity>
               ))
             )}
@@ -311,13 +370,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
               </TouchableOpacity>
             </View>
 
-            {users.map(emp => (
+            <TextInput
+              style={styles.searchBar}
+              placeholder="Search by name, email, or employee code..."
+              placeholderTextColor={Colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+
+            {filteredUsers.map(emp => (
               <View key={emp.id} style={styles.employeeCard}>
                 <View style={styles.empHeader}>
                   <View>
                     <Text style={styles.empName}>{emp.fullName}</Text>
                     <Text style={styles.empEmail}>{emp.email}</Text>
                     <Text style={styles.empCode}>{emp.employeeCode || 'N/A'}</Text>
+                    {emp.phone ? <Text style={styles.empPhone}>{emp.phone}</Text> : null}
                   </View>
                   <View style={styles.empBadgeGroup}>
                     <View style={[styles.roleBadge, { backgroundColor: Colors.primaryLight }]}>
@@ -456,6 +524,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                     <Text style={styles.metricLine}>
                       • Cold Chain Temp: {selectedProgram.completionMetrics.coldChainTempCelsius}°C
                     </Text>
+                    <Text style={styles.metricLine}>
+                      • Observations: {selectedProgram.completionMetrics.farmFlockObservations}
+                    </Text>
                   </View>
                 )}
 
@@ -463,7 +534,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                   <View style={styles.auditorBox}>
                     <Text style={styles.auditorBoxTitle}>Auditor Sign-off & Remarks</Text>
                     <Text style={styles.auditorRemarksText}>{selectedProgram.auditorRemarks}</Text>
-                    <Text style={styles.scoreBadge}>Score: {selectedProgram.auditScore}/100</Text>
+                    {selectedProgram.auditScore ? (
+                      <Text style={styles.scoreBadge}>Score: {selectedProgram.auditScore}/100</Text>
+                    ) : null}
                   </View>
                 )}
               </ScrollView>
@@ -548,6 +621,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                 onChangeText={setEmpEmail}
                 editable={!editingEmp}
               />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Phone / WhatsApp"
+                placeholderTextColor={Colors.textMuted}
+                value={empPhone}
+                onChangeText={setEmpPhone}
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Employee Code"
+                placeholderTextColor={Colors.textMuted}
+                value={empCode}
+                onChangeText={setEmpCode}
+                editable={!editingEmp}
+              />
               <Text style={styles.auditorSelectLabel}>Select Role:</Text>
               <View style={styles.rolePickerRow}>
                 {(['employee', 'program_controller', 'program_auditor', 'admin'] as UserRole[]).map(r => (
@@ -600,6 +688,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     gap: 8,
     paddingVertical: 8,
+    alignItems: 'center',
   },
   tabItem: {
     paddingHorizontal: 14,
@@ -618,6 +707,30 @@ const styles = StyleSheet.create({
   activeTabItemText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  refreshBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  searchBar: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    marginBottom: 8,
   },
   content: {
     padding: 16,
@@ -803,6 +916,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: Colors.textMuted,
+  },
+  empPhone: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   empBadgeGroup: {
     alignItems: 'flex-end',
