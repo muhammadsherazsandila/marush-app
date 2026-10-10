@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import Toast from 'react-native-toast-message';
 
 import { Colors } from './src/constants/colors';
 import { UserProfile } from './src/types';
-import { mockStore } from './src/services/supabase';
+import { dataProvider } from './src/services/supabase';
 
 import { Navbar } from './src/components/Navbar';
 import { LaunchScreen } from './src/screens/LaunchScreen';
@@ -19,15 +19,20 @@ import { EmployeeDashboard } from './src/screens/EmployeeDashboard';
 
 export default function App() {
   const [isLaunching, setIsLaunching] = useState(true);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(mockStore.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(dataProvider.getCurrentUser());
 
-  const handleLogout = () => {
-    mockStore.setCurrentUser(null);
+  useEffect(() => {
+    // Sync current session user
+    setCurrentUser(dataProvider.getCurrentUser());
+  }, []);
+
+  const handleLogout = async () => {
+    await dataProvider.signOut();
     setCurrentUser(null);
     Toast.show({
       type: 'info',
       text1: 'Signed Out',
-      text2: 'Session closed.',
+      text2: 'Session closed securely.',
     });
   };
 

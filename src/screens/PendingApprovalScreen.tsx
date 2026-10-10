@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../constants/colors';
 import { UserProfile } from '../types';
-import { mockStore } from '../services/supabase';
+import { dataProvider } from '../services/supabase';
 import { MarushLogo } from '../components/MarushLogo';
 
 interface PendingApprovalScreenProps {
@@ -17,30 +17,50 @@ export const PendingApprovalScreen: React.FC<PendingApprovalScreenProps> = ({
   onApproved,
   onBackToLogin,
 }) => {
-  const checkStatus = () => {
-    const refreshed = mockStore.getUserById(user.id);
-    if (!refreshed) {
+  const [checking, setChecking] = useState(false);
+
+  const checkStatus = async () => {
+    setChecking(true);
+    try {
+      const refreshed = await dataProvider.getUserById(user.id);
+      setChecking(false);
+
+      if (!refreshed) {
+        Toast.show({
+          type: 'error',
+          text1: 'Account Error',
+          text2: 'Account record could not be found.',
+        });
+        return;
+      }
+
+      if (refreshed.status === 'approved') {
+        Toast.show({
+          type: 'success',
+          text1: 'Account Approved!',
+          text2: `Welcome to Marush, ${refreshed.fullName}`,
+        });
+        dataProvider.setCurrentUser(refreshed);
+        onApproved(refreshed);
+      } else if (refreshed.status === 'rejected') {
+        Toast.show({
+          type: 'error',
+          text1: 'Registration Declined',
+          text2: 'Administrator declined this registration request.',
+        });
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Status: Pending',
+          text2: 'Awaiting Administrator verification and approval.',
+        });
+      }
+    } catch (err: any) {
+      setChecking(false);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: 'Account could not be found.',
-      });
-      return;
-    }
-
-    if (refreshed.status === 'approved') {
-      Toast.show({
-        type: 'success',
-        text1: 'Account Approved!',
-        text2: `Welcome to Marush, ${refreshed.fullName}`,
-      });
-      mockStore.setCurrentUser(refreshed);
-      onApproved(refreshed);
-    } else {
-      Toast.show({
-        type: 'info',
-        text1: 'Still Pending',
-        text2: 'Administrator has not yet approved this registration.',
+        text1: 'Verification Check Failed',
+        text2: err?.message || 'Network error checking status',
       });
     }
   };
@@ -62,19 +82,50 @@ export const PendingApprovalScreen: React.FC<PendingApprovalScreenProps> = ({
         </Text>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoLabel}>Account Email:</Text>
-          <Text style={styles.infoValue}>{user.email}</Text>
-          <Text style={styles.infoLabel}>Role Requested:</Text>
-          <Text style={styles.infoValue}>{user.role.replace('_', ' ').toUpperCase()}</Text>
-          <Text style={styles.infoLabel}>Current Status:</Text>
-          <Text style={styles.statusPending}>PENDING VERIFICATION</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Account Email:</Text>
+            <Text style={styles.infoValue}>{user.email}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Requested Role:</Text>
+            <Text style={styles.infoValue}>{user.role.replace('_', ' ').toUpperCase()}</Text>
+          </View>
+          {user.employeeCode ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Employee Code:</Text>
+              <Text style={styles.infoValue}>{user.employeeCode}</Text>
+            </View>
+          ) : null}
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Current Status:</Text>
+            <Text style={styles.statusPending}>PENDING APPROVAL</Text>
+          </View>
         </View>
 
-        <TouchableOpacity style={styles.refreshButton} onPress={checkStatus}>
-          <Text style={styles.refreshButtonText}>Check Approval Status</Text>
+        <View style={styles.noteBox}>
+          <Text style={styles.noteTitle}>WHAT HAPPENS NEXT?</Text>
+          <Text style={styles.noteText}>
+            The system administrator verifies employee credentials and assigns proper access permissions before activation.
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.refreshButton, checking && styles.buttonDisabled]}
+          onPress={checkStatus}
+          disabled={checking}
+        >
+          {checking ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.refreshButtonText}>Check Approval Status</Text>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.backButton} onPress={onBackToLogin}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBackToLogin}
+          disabled={checking}
+        >
           <Text style={styles.backButtonText}>Back to Sign In</Text>
         </TouchableOpacity>
       </View>
@@ -108,7 +159,7 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
     marginTop: 16,
   },
@@ -141,10 +192,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 16,
-    marginVertical: 20,
-    gap: 4,
+    marginTop: 20,
+    marginBottom: 12,
+    gap: 8,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   infoLabel: {
     fontSize: 11,
@@ -156,12 +213,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 6,
   },
   statusPending: {
     fontSize: 12,
     fontWeight: '800',
     color: '#D97706',
+  },
+  noteBox: {
+    width: '100%',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  noteTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1D4ED8',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  noteText: {
+    fontSize: 12,
+    color: '#1E40AF',
+    lineHeight: 16,
   },
   refreshButton: {
     backgroundColor: Colors.primary,
@@ -170,6 +247,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   refreshButtonText: {
     color: '#FFFFFF',

@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../constants/colors';
 import { UserProfile, UserRole } from '../types';
-import { mockStore } from '../services/supabase';
+import { dataProvider, mockStore } from '../services/supabase';
 import { MarushLogo } from '../components/MarushLogo';
 
 interface AuthScreenProps {
@@ -27,116 +28,160 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [employeeCode, setEmployeeCode] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('employee');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
-        text2: 'Please enter both email and password',
+        text2: 'Please enter both work email and password',
       });
       return;
     }
 
-    const users = mockStore.getUsers();
-    const user = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    setLoading(true);
+    try {
+      const { user, error } = await dataProvider.signInWithEmail(email, password);
 
-    if (!user) {
+      if (error || !user) {
+        Toast.show({
+          type: 'error',
+          text1: 'Sign In Failed',
+          text2: error || 'Invalid email or password',
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (user.status === 'pending') {
+        Toast.show({
+          type: 'info',
+          text1: 'Account Pending Approval',
+          text2: 'Your account is currently awaiting Admin approval.',
+        });
+        setLoading(false);
+        onRegisteredPending(user);
+        return;
+      }
+
+      if (user.status === 'rejected') {
+        Toast.show({
+          type: 'error',
+          text1: 'Access Denied',
+          text2: 'This account was declined by the administrator.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome back!',
+        text2: `Signed in as ${user.fullName}`,
+      });
+      setLoading(false);
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setLoading(false);
       Toast.show({
         type: 'error',
-        text1: 'Account Not Found',
-        text2: 'No account registered with this email.',
+        text1: 'Authentication Error',
+        text2: err?.message || 'Failed to authenticate',
       });
-      return;
     }
-
-    if (user.status === 'pending') {
-      Toast.show({
-        type: 'info',
-        text1: 'Account Pending Approval',
-        text2: 'Your account is awaiting Administrator verification.',
-      });
-      onRegisteredPending(user);
-      return;
-    }
-
-    if (user.status === 'rejected') {
-      Toast.show({
-        type: 'error',
-        text1: 'Access Denied',
-        text2: 'This account was rejected by the administrator.',
-      });
-      return;
-    }
-
-    Toast.show({
-      type: 'success',
-      text1: 'Welcome back!',
-      text2: `Logged in as ${user.fullName}`,
-    });
-    mockStore.setCurrentUser(user);
-    onLoginSuccess(user);
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
-        text2: 'Please provide full name, email, and password.',
+        text2: 'Please provide full name, work email, and password.',
       });
       return;
     }
 
-    const existing = mockStore.getUsers().find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (existing) {
+    setLoading(true);
+    try {
+      const { user, error } = await dataProvider.signUpWithEmail(email, password, {
+        fullName: fullName.trim(),
+        role: selectedRole,
+        phone: phone.trim() || undefined,
+        employeeCode: employeeCode.trim() || undefined,
+      });
+
+      if (error || !user) {
+        Toast.show({
+          type: 'error',
+          text1: 'Registration Failed',
+          text2: error || 'Could not complete registration',
+        });
+        setLoading(false);
+        return;
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Registration Submitted',
+        text2: 'Account awaiting Administrator review.',
+      });
+
+      setLoading(false);
+      onRegisteredPending(user);
+    } catch (err: any) {
+      setLoading(false);
       Toast.show({
         type: 'error',
-        text1: 'Account Exists',
-        text2: 'An account with this email already exists.',
+        text1: 'Registration Error',
+        text2: err?.message || 'Failed to register account',
       });
-      return;
     }
-
-    const newUser = mockStore.addUser({
-      email: email.trim(),
-      fullName: fullName.trim(),
-      role: selectedRole,
-      status: 'pending', // Account sent to admin for approval
-      phone: phone.trim() || undefined,
-      employeeCode: `MRSH-${Math.floor(100 + Math.random() * 900)}`,
-    });
-
-    Toast.show({
-      type: 'success',
-      text1: 'Registration Submitted',
-      text2: 'Sent to Administrator for review and approval.',
-    });
-
-    onRegisteredPending(newUser);
   };
 
-  const handleGoogleOAuth = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Google OAuth 2.0',
-      text2: 'Connecting via Google Workspace OAuth...',
-    });
-    setTimeout(() => {
-      const demoUser = mockStore.getUsers()[0];
-      mockStore.setCurrentUser(demoUser);
-      onLoginSuccess(demoUser);
-    }, 800);
+  const handleGoogleOAuth = async () => {
+    setLoading(true);
+    try {
+      const { error } = await dataProvider.signInWithGoogle();
+      if (error) {
+        Toast.show({
+          type: 'error',
+          text1: 'Google OAuth Error',
+          text2: error,
+        });
+        setLoading(false);
+        return;
+      }
+
+      const user = dataProvider.getCurrentUser();
+      if (user) {
+        Toast.show({
+          type: 'success',
+          text1: 'Google Workspace Verified',
+          text2: `Signed in as ${user.fullName}`,
+        });
+        setLoading(false);
+        onLoginSuccess(user);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      Toast.show({
+        type: 'error',
+        text1: 'Google Sign-In Error',
+        text2: err?.message || 'Failed to authenticate with Google',
+      });
+    }
   };
 
   const quickLoginAs = (userRole: UserRole) => {
     const user = mockStore.getUsers().find(u => u.role === userRole && u.status === 'approved');
     if (user) {
-      mockStore.setCurrentUser(user);
+      dataProvider.setCurrentUser(user);
       Toast.show({
         type: 'success',
-        text1: `Quick Login: ${user.fullName}`,
+        text1: `Demo Login: ${user.fullName}`,
         text2: `Role: ${user.role.toUpperCase()}`,
       });
       onLoginSuccess(user);
@@ -144,7 +189,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
       <View style={styles.card}>
         <MarushLogo size="md" variant="full" showSubtitle={false} />
 
@@ -152,6 +197,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <TouchableOpacity
             style={[styles.tabButton, isLoginTab && styles.activeTabButton]}
             onPress={() => setIsLoginTab(true)}
+            disabled={loading}
           >
             <Text style={[styles.tabButtonText, isLoginTab && styles.activeTabText]}>
               Sign In
@@ -160,6 +206,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <TouchableOpacity
             style={[styles.tabButton, !isLoginTab && styles.activeTabButton]}
             onPress={() => setIsLoginTab(false)}
+            disabled={loading}
           >
             <Text style={[styles.tabButtonText, !isLoginTab && styles.activeTabText]}>
               Register
@@ -179,6 +226,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!loading}
               />
             </View>
 
@@ -191,11 +239,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                editable={!loading}
               />
             </View>
 
-            <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
-              <Text style={styles.primaryButtonText}>Sign In</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.dividerRow}>
@@ -204,7 +261,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleOAuth}>
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={handleGoogleOAuth}
+              disabled={loading}
+            >
               <Text style={styles.googleButtonText}>Continue with Google OAuth 2.0</Text>
             </TouchableOpacity>
 
@@ -249,6 +310,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 placeholderTextColor={Colors.textMuted}
                 value={fullName}
                 onChangeText={setFullName}
+                editable={!loading}
               />
             </View>
 
@@ -262,6 +324,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!loading}
               />
             </View>
 
@@ -274,6 +337,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Employee Code (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. MRSH-EMP-105"
+                placeholderTextColor={Colors.textMuted}
+                value={employeeCode}
+                onChangeText={setEmployeeCode}
+                autoCapitalize="characters"
+                editable={!loading}
               />
             </View>
 
@@ -286,11 +363,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                editable={!loading}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Assign Role (Default: Employee)</Text>
+              <Text style={styles.inputLabel}>Requested Role (Default: Employee)</Text>
               <View style={styles.roleGrid}>
                 {[
                   { id: 'employee', label: 'Employee (Default)' },
@@ -305,6 +383,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       selectedRole === r.id && styles.roleChipActive,
                     ]}
                     onPress={() => setSelectedRole(r.id as UserRole)}
+                    disabled={loading}
                   >
                     <Text
                       style={[
@@ -319,8 +398,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </View>
             </View>
 
-            <TouchableOpacity style={styles.primaryButton} onPress={handleRegister}>
-              <Text style={styles.primaryButtonText}>Submit for Admin Approval</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Submit for Admin Approval</Text>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -434,6 +521,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: '#FFFFFF',

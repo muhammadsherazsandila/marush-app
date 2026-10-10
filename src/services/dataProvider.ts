@@ -173,7 +173,7 @@ const INITIAL_PROGRAMS: Program[] = [
 
 let usersDb: UserProfile[] = [...INITIAL_USERS];
 let programsDb: Program[] = [...INITIAL_PROGRAMS];
-let currentSessionUser: UserProfile | null = INITIAL_USERS[0];
+let currentSessionUser: UserProfile | null = null;
 
 // ==========================================
 // MOCK STORE (Direct synchronous helper)
@@ -519,6 +519,14 @@ export const dataProvider = {
       if (data) return mapProfileRow(data);
     }
     return mockStore.updateUserRole(id, role);
+  },
+
+  getPendingUsers: async (): Promise<UserProfile[]> => {
+    if (isSupabaseConfigured) {
+      const { data } = await supabase.from('profiles').select('*').eq('status', 'pending');
+      return (data || []).map(mapProfileRow);
+    }
+    return mockStore.getUsers().filter(u => u.status === 'pending');
   },
 
   deleteUser: async (id: string): Promise<boolean> => {
