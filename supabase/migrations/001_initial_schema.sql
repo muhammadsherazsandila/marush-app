@@ -153,6 +153,22 @@ RETURNS BOOLEAN AS $$
     SELECT (public.current_profile_role() = 'admin');
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
+CREATE OR REPLACE FUNCTION public.is_user_in_program(p_program_id UUID, p_user_id UUID)
+RETURNS BOOLEAN AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.program_members
+        WHERE program_id = p_program_id AND user_id = p_user_id
+    );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_user_controller_or_auditor(p_program_id UUID, p_user_id UUID)
+RETURNS BOOLEAN AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.programs
+        WHERE id = p_program_id AND (controller_id = p_user_id OR auditor_id = p_user_id)
+    );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
 -- -----------------------------------------------------------------------------
 -- 6. ROW LEVEL SECURITY (RLS) POLICIES
 -- -----------------------------------------------------------------------------
@@ -204,10 +220,7 @@ CREATE POLICY "programs_select" ON public.programs
         public.is_admin()
         OR controller_id = public.current_profile_id()
         OR auditor_id = public.current_profile_id()
-        OR id IN (
-            SELECT program_id FROM public.program_members
-            WHERE user_id = public.current_profile_id()
-        )
+        OR public.is_user_in_program(id, public.current_profile_id())
     );
 
 DROP POLICY IF EXISTS "programs_insert" ON public.programs;
@@ -248,11 +261,7 @@ CREATE POLICY "pm_select" ON public.program_members
     USING (
         public.is_admin()
         OR user_id = public.current_profile_id()
-        OR program_id IN (
-            SELECT id FROM public.programs
-            WHERE controller_id = public.current_profile_id()
-               OR auditor_id = public.current_profile_id()
-        )
+        OR public.is_user_controller_or_auditor(program_id, public.current_profile_id())
     );
 
 DROP POLICY IF EXISTS "pm_insert" ON public.program_members;
@@ -260,10 +269,7 @@ CREATE POLICY "pm_insert" ON public.program_members
     FOR INSERT TO authenticated
     WITH CHECK (
         public.is_admin()
-        OR program_id IN (
-            SELECT id FROM public.programs
-            WHERE controller_id = public.current_profile_id()
-        )
+        OR public.is_user_controller_or_auditor(program_id, public.current_profile_id())
     );
 
 DROP POLICY IF EXISTS "pm_delete" ON public.program_members;
@@ -271,10 +277,7 @@ CREATE POLICY "pm_delete" ON public.program_members
     FOR DELETE TO authenticated
     USING (
         public.is_admin()
-        OR program_id IN (
-            SELECT id FROM public.programs
-            WHERE controller_id = public.current_profile_id()
-        )
+        OR public.is_user_controller_or_auditor(program_id, public.current_profile_id())
     );
 
 -- ---- PROGRAM AUDITS POLICIES ----
@@ -284,10 +287,7 @@ CREATE POLICY "pa_select" ON public.program_audits
     USING (
         public.is_admin()
         OR auditor_id = public.current_profile_id()
-        OR program_id IN (
-            SELECT id FROM public.programs
-            WHERE controller_id = public.current_profile_id()
-        )
+        OR public.is_user_controller_or_auditor(program_id, public.current_profile_id())
     );
 
 DROP POLICY IF EXISTS "pa_insert" ON public.program_audits;
