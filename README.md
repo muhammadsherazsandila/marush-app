@@ -73,6 +73,23 @@ pnpm run typecheck
 pnpm run build:web
 ```
 
+### 🗄️ Database Migrations
+Manage Supabase PostgreSQL migrations using the built-in migration runner:
+
+```bash
+# Check current migration status against Supabase database
+pnpm migrate:status
+
+# Create a new numbered migration file (e.g., supabase/migrations/004_add_flock_types.sql)
+pnpm migrate:new <migration_name>
+
+# Apply all pending migrations to the database
+pnpm migrate:up
+
+# CI check: Verify no migrations are pending (exits with code 1 if unapplied)
+pnpm migrate:check
+```
+
 ---
 
 ## 🏷️ Release Milestones
