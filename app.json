@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Marush",
+    "slug": "marush-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#004F42"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.marush.vaccination"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#004F42"
+      },
+      "package": "com.marush.vaccination"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": []
+  }
+}

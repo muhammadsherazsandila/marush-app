@@ -1,0 +1,76 @@
+name: Release Application
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Application and Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run TypeScript Check
+        run: pnpm run typecheck
+
+      - name: Build Production Expo Web & Mobile Bundle
+        run: pnpm exec expo export --platform web
+
+      - name: Package Web Production Distribution
+        run: |
+          cd dist
+          zip -r ../marush-app-web-${{ github.ref_name }}.zip .
+          cd ..
+
+      - name: Generate Changelog & Release Notes
+        id: release_notes
+        run: |
+          echo "### 🚀 Marush Application Release ${{ github.ref_name }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "**Marush (Pvt.) Ltd. — Poultry Vaccination & Flock Monitoring Service**" >> release_notes.md
+          echo "- Exclusive Ceva Animal Health Sole Distributor Pakistan" >> release_notes.md
+          echo "- Built with Expo, Supabase, TypeScript, Tailwind, Lucide Icons, and Framer Motion" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Key Features Included in this Release:" >> release_notes.md
+          echo "- 🔐 RBAC Authentication (Admin, Program Controller, Program Auditor, Employee)" >> release_notes.md
+          echo "- 🛡️ Account approval pipeline for Admin review" >> release_notes.md
+          echo "- 📊 Admin Dashboard: Overview, Active Programs, Completed Programs, Employee CRUD" >> release_notes.md
+          echo "- 👥 Program Controller: Dynamic team creation filtering active vs available employees" >> release_notes.md
+          echo "- 🔍 Program Auditor: Dedicated inspection queue, sign-off and remarks" >> release_notes.md
+          echo "- 📱 Employee Dashboard: Attended programs & assigned role history" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "#### Assets:" >> release_notes.md
+          echo "- \`marush-app-web-${{ github.ref_name }}.zip\` (Production Web & PWA bundle)" >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          files: |
+            marush-app-web-${{ github.ref_name }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
