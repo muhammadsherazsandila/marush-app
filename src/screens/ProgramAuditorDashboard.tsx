@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,28 +7,54 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../constants/colors';
-import { UserProfile, Program } from '../types';
-import { mockStore } from '../services/supabase';
+import { UserProfile, Program, AuditChecklistItem } from '../types';
+import { dataProvider, mockStore } from '../services/supabase';
 
 interface ProgramAuditorDashboardProps {
   currentUser: UserProfile;
 }
 
-export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = () => {
+const DEFAULT_CHECKLIST: AuditChecklistItem[] = [
+  { item: 'Cold-chain maintained at optimal 2°C - 8°C throughout', passed: true },
+  { item: 'Vaccine batch number & Ceva pharmaceutical seal verified', passed: true },
+  { item: 'Automated injection / spray equipment sterilized per SOP', passed: true },
+  { item: 'Dosage calibration verified per bird / crate count', passed: true },
+  { item: 'Flock vitality and post-vaccine condition confirmed', passed: true },
+];
+
+export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = ({
+  currentUser,
+}) => {
   const [programs, setPrograms] = useState<Program[]>(mockStore.getPrograms());
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Review Modal State
   const [auditingProgram, setAuditingProgram] = useState<Program | null>(null);
   const [remarks, setRemarks] = useState('');
-  const [score, setScore] = useState('95');
+  const [score, setScore] = useState('96');
+  const [checklist, setChecklist] = useState<AuditChecklistItem[]>(DEFAULT_CHECKLIST);
 
-  const refreshData = () => {
-    setPrograms(mockStore.getPrograms());
-  };
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const allProgs = await dataProvider.getPrograms();
+      setPrograms(allProgs);
+    } catch {
+      setPrograms(mockStore.getPrograms());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const pendingAudits = programs.filter(p => p.status === 'pending_audit');
   const completedAudits = programs.filter(p => p.status === 'completed' && p.auditorRemarks);
@@ -36,14 +62,23 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
   const handleOpenAuditModal = (prog: Program) => {
     setAuditingProgram(prog);
     setRemarks(
-      `Cold-chain parameters verified. Vaccination batch ${
+      `Cold-chain log verified at ${
+        prog.completionMetrics?.coldChainTempCelsius || 4.0
+      }°C. Vaccine batch ${
         prog.completionMetrics?.batchNumber || 'N/A'
-      } meets Ceva pharmaceutical standards. Flock viability approved.`
+      } meets Ceva standards. Flock viability approved.`
     );
     setScore('96');
+    setChecklist(DEFAULT_CHECKLIST);
   };
 
-  const handleSignOffAudit = () => {
+  const toggleChecklistItem = (index: number) => {
+    const updated = [...checklist];
+    updated[index].passed = !updated[index].passed;
+    setChecklist(updated);
+  };
+
+  const handleSignOffAudit = async () => {
     if (!auditingProgram) return;
 
     if (!remarks.trim()) {
@@ -55,38 +90,73 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
       return;
     }
 
-    const auditScoreNum = parseInt(score.trim(), 10) || 90;
+    const auditScoreNum = parseInt(score.trim(), 10);
+    if (isNaN(auditScoreNum) || auditScoreNum < 0 || auditScoreNum > 100) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Score',
+        text2: 'Score must be a number between 0 and 100.',
+      });
+      return;
+    }
 
-    mockStore.submitAuditorRemarks(auditingProgram.id, remarks.trim(), auditScoreNum);
+    setSubmitting(true);
+    try {
+      await dataProvider.submitAuditRemarks(
+        auditingProgram.id,
+        currentUser.id,
+        remarks.trim(),
+        auditScoreNum,
+        checklist
+      );
 
-    Toast.show({
-      type: 'success',
-      text1: 'Audit Signed Off & Program Completed',
-      text2: `${auditingProgram.programName} marked as DONE and visible in Admin dashboard.`,
-    });
+      Toast.show({
+        type: 'success',
+        text1: 'Audit Signed Off & Program Completed',
+        text2: `${auditingProgram.programName} marked as DONE and synchronized with Admin records.`,
+      });
 
-    setAuditingProgram(null);
-    refreshData();
+      setAuditingProgram(null);
+      refreshData();
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Audit Submission Failed',
+        text2: err?.message || 'Could not complete audit.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'pending' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('pending')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'pending' && styles.tabBtnTextActive]}>
-            Pending Review ({pendingAudits.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'completed' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'completed' && styles.tabBtnTextActive]}>
-            Audited Programs ({completedAudits.length})
-          </Text>
+        <View style={styles.tabGroup}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'pending' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('pending')}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'pending' && styles.tabBtnTextActive]}>
+              Pending Review ({pendingAudits.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'completed' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('completed')}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'completed' && styles.tabBtnTextActive]}>
+              Audited Programs ({completedAudits.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#8B5CF6" />
+          ) : (
+            <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -124,7 +194,7 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
                     style={styles.reviewBtn}
                     onPress={() => handleOpenAuditModal(prog)}
                   >
-                    <Text style={styles.reviewBtnText}>Review & Enter Remarks</Text>
+                    <Text style={styles.reviewBtnText}>Inspect & Enter Remarks</Text>
                   </TouchableOpacity>
                 </View>
               ))
@@ -133,21 +203,27 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
         ) : (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Historical Audits & Remarks Log</Text>
-            {completedAudits.map(prog => (
-              <View key={prog.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle}>{prog.programName}</Text>
-                  <View style={styles.doneBadge}>
-                    <Text style={styles.doneBadgeText}>AUDITED & DONE</Text>
+            {completedAudits.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyText}>No completed audits recorded yet.</Text>
+              </View>
+            ) : (
+              completedAudits.map(prog => (
+                <View key={prog.id} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle}>{prog.programName}</Text>
+                    <View style={styles.doneBadge}>
+                      <Text style={styles.doneBadgeText}>AUDITED & DONE</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
+                  <Text style={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
+                  <View style={styles.remarksBox}>
+                    <Text style={styles.remarksText}>"{prog.auditorRemarks}"</Text>
                   </View>
                 </View>
-                <Text style={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                <Text style={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
-                <View style={styles.remarksBox}>
-                  <Text style={styles.remarksText}>"{prog.auditorRemarks}"</Text>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         )}
       </ScrollView>
@@ -182,6 +258,28 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
                   </Text>
                 </View>
 
+                {/* Audit Checklist */}
+                <View style={styles.checklistSection}>
+                  <Text style={styles.checklistTitle}>Verification Checklist:</Text>
+                  {checklist.map((item, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.checkItemRow}
+                      onPress={() => toggleChecklistItem(idx)}
+                    >
+                      <View
+                        style={[
+                          styles.checkbox,
+                          item.passed ? styles.checkboxChecked : styles.checkboxUnchecked,
+                        ]}
+                      >
+                        <Text style={styles.checkboxText}>{item.passed ? '✓' : ''}</Text>
+                      </View>
+                      <Text style={styles.checkItemText}>{item.item}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Auditor Remarks & Compliance Notes</Text>
                   <TextInput
@@ -207,14 +305,20 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
                 <TouchableOpacity
                   style={styles.cancelModalBtn}
                   onPress={() => setAuditingProgram(null)}
+                  disabled={submitting}
                 >
                   <Text style={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.signOffBtn}
+                  style={[styles.signOffBtn, submitting && styles.btnDisabled]}
                   onPress={handleSignOffAudit}
+                  disabled={submitting}
                 >
-                  <Text style={styles.signOffBtnText}>Sign Off & Mark Program Done</Text>
+                  {submitting ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.signOffBtnText}>Sign Off & Mark Program Done</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -232,11 +336,16 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  tabGroup: {
+    flexDirection: 'row',
     gap: 10,
   },
   tabBtn: {
@@ -256,6 +365,19 @@ const styles = StyleSheet.create({
   tabBtnTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  refreshBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
   content: {
     padding: 16,
@@ -415,6 +537,53 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: 6,
   },
+  checklistSection: {
+    backgroundColor: '#FAF5FF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    gap: 8,
+  },
+  checklistTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6D28D9',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  checkItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  checkboxUnchecked: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8B4FE',
+  },
+  checkboxText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  checkItemText: {
+    fontSize: 12,
+    color: Colors.textPrimary,
+    flex: 1,
+  },
   inputGroup: {
     gap: 4,
     marginBottom: 10,
@@ -447,10 +616,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   signOffBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#8B5CF6',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+  },
+  btnDisabled: {
+    opacity: 0.7,
   },
   signOffBtnText: {
     color: '#FFFFFF',

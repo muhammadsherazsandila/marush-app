@@ -1,15 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program } from '../types';
-import { mockStore } from '../services/supabase';
+import { dataProvider, mockStore } from '../services/supabase';
 
 interface EmployeeDashboardProps {
   currentUser: UserProfile;
 }
 
 export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser }) => {
-  const allPrograms = mockStore.getPrograms();
+  const [allPrograms, setAllPrograms] = useState<Program[]>(mockStore.getPrograms());
+  const [loading, setLoading] = useState(false);
+
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const progs = await dataProvider.getPrograms();
+      setAllPrograms(progs);
+    } catch {
+      setAllPrograms(mockStore.getPrograms());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   // Find all programs where this employee was controller OR team member
   const attendedPrograms = allPrograms.filter(
@@ -22,15 +46,24 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.content}>
-        {/* Profile Summary Card */}
+        {/* Profile Summary Card with Refresh */}
         <View style={styles.profileCard}>
           <View>
             <Text style={styles.welcomeText}>Field Personnel Portal</Text>
             <Text style={styles.employeeName}>{currentUser.fullName}</Text>
             <Text style={styles.employeeCode}>{currentUser.employeeCode || 'MRSH-EMP'}</Text>
           </View>
-          <View style={styles.roleTag}>
-            <Text style={styles.roleTagText}>{currentUser.role.replace('_', ' ').toUpperCase()}</Text>
+          <View style={styles.rightHeaderGroup}>
+            <View style={styles.roleTag}>
+              <Text style={styles.roleTagText}>{currentUser.role.replace('_', ' ').toUpperCase()}</Text>
+            </View>
+            <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -68,7 +101,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>
               You have not been assigned to any programs yet. When a Program Controller selects
-              you for a team, it will appear here.
+              you for a team, it will appear here in real time.
             </Text>
           </View>
         ) : (
@@ -112,22 +145,30 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
 
                 {prog.completionMetrics && (
                   <View style={styles.metricsBox}>
-                    <Text style={styles.metricsTitle}>Vaccination Records:</Text>
+                    <Text style={styles.metricsTitle}>Vaccination & Cold-Chain Records:</Text>
                     <Text style={styles.metricsText}>
                       • Birds Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()}
                     </Text>
                     <Text style={styles.metricsText}>
                       • Vaccine: {prog.completionMetrics.vaccineType} (Batch: {prog.completionMetrics.batchNumber})
                     </Text>
+                    <Text style={styles.metricsText}>
+                      • Cold Chain Log: {prog.completionMetrics.coldChainTempCelsius}°C
+                    </Text>
                   </View>
                 )}
 
-                {prog.auditorRemarks && (
+                {prog.auditorRemarks ? (
                   <View style={styles.remarksBox}>
-                    <Text style={styles.remarksTitle}>Auditor Remarks ({prog.auditorName}):</Text>
+                    <Text style={styles.remarksTitle}>
+                      Auditor Remarks ({prog.auditorName}):
+                    </Text>
                     <Text style={styles.remarksText}>"{prog.auditorRemarks}"</Text>
+                    {prog.auditScore ? (
+                      <Text style={styles.scorePill}>Score: {prog.auditScore}/100</Text>
+                    ) : null}
                   </View>
-                )}
+                ) : null}
               </View>
             );
           })
@@ -177,6 +218,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
+  rightHeaderGroup: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   roleTag: {
     backgroundColor: '#E0F2FE',
     paddingHorizontal: 10,
@@ -187,6 +232,19 @@ const styles = StyleSheet.create({
     color: '#0369A1',
     fontWeight: '800',
     fontSize: 10,
+  },
+  refreshBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  refreshBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   sectionHeading: {
     fontSize: 15,
@@ -335,5 +393,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#166534',
     fontStyle: 'italic',
+  },
+  scorePill: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803D',
+    marginTop: 2,
   },
 });
