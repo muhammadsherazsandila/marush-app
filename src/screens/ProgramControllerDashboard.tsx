@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,12 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, ProgramCompletionMetrics } from '../types';
-import { mockStore } from '../services/supabase';
+import { dataProvider, mockStore } from '../services/supabase';
 
 interface ProgramControllerDashboardProps {
   currentUser: UserProfile;
@@ -25,6 +26,8 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   const [availableEmployees, setAvailableEmployees] = useState<UserProfile[]>(
     mockStore.getAvailableEmployees()
   );
+  const [loading, setLoading] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Form State for Program Initiation
   const [programName, setProgramName] = useState('');
@@ -39,16 +42,33 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   // End Program / Send to Auditor Modal
   const [endingProgram, setEndingProgram] = useState<Program | null>(null);
   const [birdsVaccinated, setBirdsVaccinated] = useState('');
-  const [dosagePerBird, setDosagePerBird] = useState('0.05 ml via automated injector');
-  const [batchNumber, setBatchNumber] = useState('VND-2026-');
-  const [vaccineType, setVaccineType] = useState('Vectormune ND (Ceva)');
+  const [dosagePerBird, setDosagePerBird] = useState('0.05 ml via automated Ceva Egginject');
+  const [batchNumber, setBatchNumber] = useState('VND-2026-PK');
+  const [vaccineType, setVaccineType] = useState('Vectormune ND + Cevac Transmune');
   const [coldChainTemp, setColdChainTemp] = useState('4.0');
-  const [farmFlockNotes, setFarmFlockNotes] = useState('');
+  const [equipmentCheckPassed, setEquipmentCheckPassed] = useState(true);
+  const [farmFlockNotes, setFarmFlockNotes] = useState('Flock condition optimal. Sterilization protocol followed.');
 
-  const refreshData = () => {
-    setPrograms(mockStore.getPrograms());
-    setAvailableEmployees(mockStore.getAvailableEmployees());
-  };
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [allProgs, available] = await Promise.all([
+        dataProvider.getPrograms(),
+        dataProvider.getAvailableEmployees(),
+      ]);
+      setPrograms(allProgs);
+      setAvailableEmployees(available);
+    } catch {
+      setPrograms(mockStore.getPrograms());
+      setAvailableEmployees(mockStore.getAvailableEmployees());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const myPrograms = programs.filter(p => p.controllerId === currentUser.id);
 
@@ -60,12 +80,22 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
     }
   };
 
-  const handleInitiateProgram = () => {
+  const handleInitiateProgram = async () => {
     if (!programName.trim() || !hatcheryOrFarm.trim() || !flockSize.trim()) {
       Toast.show({
         type: 'error',
         text1: 'Required Fields Missing',
         text2: 'Please provide program name, hatchery/farm, and flock size.',
+      });
+      return;
+    }
+
+    const parsedFlock = parseInt(flockSize.trim(), 10);
+    if (isNaN(parsedFlock) || parsedFlock <= 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Flock Size',
+        text2: 'Please enter a valid positive number for flock size.',
       });
       return;
     }
@@ -79,87 +109,123 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
       return;
     }
 
-    const newProg = mockStore.createProgram({
-      programName: programName.trim(),
-      hatcheryOrFarmName: hatcheryOrFarm.trim(),
-      flockSize: parseInt(flockSize.trim(), 10) || 10000,
-      scheduledStartDate: startDate,
-      scheduledStartTime: startTime,
-      scheduledEndDate: endDate,
-      scheduledEndTime: endTime,
-      controllerId: currentUser.id,
-      controllerName: currentUser.fullName,
-      teamMemberIds: selectedEmpIds,
-    });
+    setSubmitting(true);
+    try {
+      const newProg = await dataProvider.createProgram({
+        programName: programName.trim(),
+        hatcheryOrFarmName: hatcheryOrFarm.trim(),
+        flockSize: parsedFlock,
+        scheduledStartDate: startDate,
+        scheduledStartTime: startTime,
+        scheduledEndDate: endDate,
+        scheduledEndTime: endTime,
+        controllerId: currentUser.id,
+        teamMemberIds: selectedEmpIds,
+      });
 
-    Toast.show({
-      type: 'success',
-      text1: 'Team Submitted to Admin',
-      text2: `${newProg.programName} sent for admin review and auditor assignment.`,
-    });
+      Toast.show({
+        type: 'success',
+        text1: 'Team Submitted to Admin',
+        text2: `${newProg.programName} sent for admin review and auditor assignment.`,
+      });
 
-    // Reset Form
-    setProgramName('');
-    setHatcheryOrFarm('');
-    setFlockSize('');
-    setSelectedEmpIds([]);
-    setActiveTab('my_programs');
-    refreshData();
+      // Reset Form
+      setProgramName('');
+      setHatcheryOrFarm('');
+      setFlockSize('');
+      setSelectedEmpIds([]);
+      setActiveTab('my_programs');
+      refreshData();
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Submission Failed',
+        text2: err?.message || 'Could not initiate program.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleOpenEndProgram = (prog: Program) => {
     setEndingProgram(prog);
     setBirdsVaccinated(prog.flockSize.toString());
+    setDosagePerBird('0.05 ml via automated Ceva Egginject');
+    setBatchNumber('VND-2026-PK');
+    setVaccineType('Vectormune ND + Cevac Transmune');
+    setColdChainTemp('4.0');
+    setEquipmentCheckPassed(true);
     setFarmFlockNotes('Vaccination carried out per Ceva standard protocol. Cold-chain verified.');
   };
 
-  const handleConfirmEndProgram = () => {
+  const handleConfirmEndProgram = async () => {
     if (!endingProgram) return;
 
-    const metrics: ProgramCompletionMetrics = {
-      birdsVaccinated: parseInt(birdsVaccinated.trim(), 10) || endingProgram.flockSize,
-      dosagePerBird: dosagePerBird.trim(),
-      batchNumber: batchNumber.trim(),
-      vaccineType: vaccineType.trim(),
-      coldChainTempCelsius: parseFloat(coldChainTemp.trim()) || 4.0,
-      equipmentCheckPassed: true,
-      farmFlockObservations: farmFlockNotes.trim(),
-    };
+    setSubmitting(true);
+    try {
+      const metrics: ProgramCompletionMetrics = {
+        birdsVaccinated: parseInt(birdsVaccinated.trim(), 10) || endingProgram.flockSize,
+        dosagePerBird: dosagePerBird.trim(),
+        batchNumber: batchNumber.trim(),
+        vaccineType: vaccineType.trim(),
+        coldChainTempCelsius: parseFloat(coldChainTemp.trim()) || 4.0,
+        equipmentCheckPassed,
+        farmFlockObservations: farmFlockNotes.trim(),
+      };
 
-    mockStore.submitProgramCompletion(endingProgram.id, metrics);
+      await dataProvider.submitProgramCompletion(endingProgram.id, metrics);
 
-    Toast.show({
-      type: 'success',
-      text1: 'Program Ended & Submitted',
-      text2: 'Details forwarded to Program Auditor for remarks.',
-    });
+      Toast.show({
+        type: 'success',
+        text1: 'Program Ended & Submitted',
+        text2: 'Details forwarded to Program Auditor for remarks.',
+      });
 
-    setEndingProgram(null);
-    refreshData();
+      setEndingProgram(null);
+      refreshData();
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Submission Error',
+        text2: err?.message || 'Could not complete program.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <View style={styles.container}>
-      {/* Tab Switcher */}
+      {/* Tab Switcher & Refresh */}
       <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'my_programs' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('my_programs')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'my_programs' && styles.tabBtnTextActive]}>
-            My Programs ({myPrograms.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'initiate' && styles.tabBtnActive]}
-          onPress={() => {
-            refreshData();
-            setActiveTab('initiate');
-          }}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'initiate' && styles.tabBtnTextActive]}>
-            + Initiate New Program
-          </Text>
+        <View style={styles.tabGroup}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'my_programs' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('my_programs')}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'my_programs' && styles.tabBtnTextActive]}>
+              My Programs ({myPrograms.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'initiate' && styles.tabBtnActive]}
+            onPress={() => {
+              refreshData();
+              setActiveTab('initiate');
+            }}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'initiate' && styles.tabBtnTextActive]}>
+              + Initiate Program
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -212,6 +278,9 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                   <Text style={styles.cardMeta}>
                     Schedule: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
                   </Text>
+                  {prog.auditorName ? (
+                    <Text style={styles.cardMeta}>Assigned Auditor: {prog.auditorName}</Text>
+                  ) : null}
 
                   {prog.status === 'active' && (
                     <TouchableOpacity
@@ -238,14 +307,17 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                     </View>
                   )}
 
-                  {prog.status === 'completed' && prog.auditorRemarks && (
+                  {prog.status === 'completed' && prog.auditorRemarks ? (
                     <View style={styles.auditFeedback}>
                       <Text style={styles.auditFeedbackTitle}>
                         Auditor Sign-off ({prog.auditorName}):
                       </Text>
                       <Text style={styles.auditFeedbackText}>"{prog.auditorRemarks}"</Text>
+                      {prog.auditScore ? (
+                        <Text style={styles.auditScorePill}>Audit Score: {prog.auditScore}/100</Text>
+                      ) : null}
                     </View>
-                  )}
+                  ) : null}
                 </View>
               ))
             )}
@@ -254,7 +326,7 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Initiate Field Program & Draft Team</Text>
             <Text style={styles.formSub}>
-              Select available personnel who are not engaged in other active programs.
+              Select available personnel who are not engaged in any other active concurrent programs.
             </Text>
 
             <View style={styles.inputGroup}>
@@ -334,14 +406,16 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
               <View style={styles.empSelectHeader}>
                 <Text style={styles.label}>Select Available Team Members</Text>
                 <Text style={styles.availCount}>
-                  {availableEmployees.length} Available (Non-Active)
+                  {availableEmployees.length} Available Staff
                 </Text>
               </View>
 
               {availableEmployees.length === 0 ? (
-                <Text style={styles.noEmpWarning}>
-                  All employees are currently assigned to active programs!
-                </Text>
+                <View style={styles.noEmpBox}>
+                  <Text style={styles.noEmpWarning}>
+                    All employees are currently occupied in active programs!
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.empListGrid}>
                   {availableEmployees.map(emp => {
@@ -359,7 +433,7 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                           ]}
                         >
                           {isSelected ? '✓ ' : '+ '}
-                          {emp.fullName}
+                          {emp.fullName} ({emp.employeeCode || emp.role})
                         </Text>
                       </TouchableOpacity>
                     );
@@ -368,8 +442,16 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
               )}
             </View>
 
-            <TouchableOpacity style={styles.submitProgBtn} onPress={handleInitiateProgram}>
-              <Text style={styles.submitProgBtnText}>Submit Team to Admin for Approval</Text>
+            <TouchableOpacity
+              style={[styles.submitProgBtn, submitting && styles.btnDisabled]}
+              onPress={handleInitiateProgram}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.submitProgBtnText}>Submit Team to Admin for Approval</Text>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -380,7 +462,7 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
         <Modal visible transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>End Program & Submit to Auditor</Text>
+              <Text style={styles.modalTitle}>End Program & Record Metrics</Text>
               <Text style={styles.modalSub}>{endingProgram.programName}</Text>
 
               <ScrollView style={styles.modalScroll}>
@@ -432,7 +514,22 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Flock Monitoring Notes</Text>
+                  <Text style={styles.label}>Equipment Check Status</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleBtn,
+                      equipmentCheckPassed ? styles.toggleBtnPassed : styles.toggleBtnFailed,
+                    ]}
+                    onPress={() => setEquipmentCheckPassed(!equipmentCheckPassed)}
+                  >
+                    <Text style={styles.toggleBtnText}>
+                      {equipmentCheckPassed ? '✓ Equipment Check PASSED' : '✕ Equipment Check FAILED'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Flock Monitoring Observations</Text>
                   <TextInput
                     style={[styles.input, { height: 60 }]}
                     multiline
@@ -446,14 +543,20 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                 <TouchableOpacity
                   style={styles.cancelModalBtn}
                   onPress={() => setEndingProgram(null)}
+                  disabled={submitting}
                 >
                   <Text style={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.confirmModalBtn}
+                  style={[styles.confirmModalBtn, submitting && styles.btnDisabled]}
                   onPress={handleConfirmEndProgram}
+                  disabled={submitting}
                 >
-                  <Text style={styles.confirmModalBtnText}>Send to Auditor</Text>
+                  {submitting ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.confirmModalBtnText}>Send to Auditor</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -471,11 +574,16 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  tabGroup: {
+    flexDirection: 'row',
     gap: 10,
   },
   tabBtn: {
@@ -495,6 +603,19 @@ const styles = StyleSheet.create({
   tabBtnTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  refreshBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   content: {
     padding: 16,
@@ -610,6 +731,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 2,
   },
+  auditScorePill: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803D',
+    marginTop: 4,
+  },
   formCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -659,11 +786,18 @@ const styles = StyleSheet.create({
     color: Colors.secondaryDark,
     fontWeight: '700',
   },
+  noEmpBox: {
+    backgroundColor: '#FEF2F2',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    marginVertical: 4,
+  },
   noEmpWarning: {
     fontSize: 12,
     color: '#DC2626',
     fontStyle: 'italic',
-    marginVertical: 4,
   },
   empListGrid: {
     flexDirection: 'row',
@@ -699,6 +833,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  btnDisabled: {
+    opacity: 0.7,
+  },
   submitProgBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
@@ -731,6 +868,23 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     marginBottom: 16,
+  },
+  toggleBtn: {
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  toggleBtnPassed: {
+    backgroundColor: '#DCFCE7',
+  },
+  toggleBtnFailed: {
+    backgroundColor: '#FEE2E2',
+  },
+  toggleBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
   modalBtnRow: {
     flexDirection: 'row',
