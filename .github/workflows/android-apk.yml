@@ -59,7 +59,8 @@ jobs:
           EXPO_PUBLIC_AUTH_REDIRECT_URL: marushapp://auth/callback
         run: |
           chmod +x android/gradlew
-          android/gradlew assembleRelease --no-daemon --stacktrace
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk "marush-${GITHUB_REF_NAME}.apk"
