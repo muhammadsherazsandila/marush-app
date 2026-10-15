@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -10,16 +9,18 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { Check, ClipboardCheck, RefreshCw, ShieldCheck } from 'lucide-react-native';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, AuditChecklistItem } from '../types';
-import { dataProvider, mockStore } from '../services/supabase';
+import { dataProvider } from '../services';
 
 interface ProgramAuditorDashboardProps {
   currentUser: UserProfile;
+  activeArea: 'overview' | 'programs';
 }
 
 const DEFAULT_CHECKLIST: AuditChecklistItem[] = [
-  { item: 'Cold-chain maintained at optimal 2°C - 8°C throughout', passed: true },
+  { item: 'Cold-chain maintained at optimal 2Ã‚Â°C - 8Ã‚Â°C throughout', passed: true },
   { item: 'Vaccine batch number & Ceva pharmaceutical seal verified', passed: true },
   { item: 'Automated injection / spray equipment sterilized per SOP', passed: true },
   { item: 'Dosage calibration verified per bird / crate count', passed: true },
@@ -28,8 +29,9 @@ const DEFAULT_CHECKLIST: AuditChecklistItem[] = [
 
 export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = ({
   currentUser,
+  activeArea,
 }) => {
-  const [programs, setPrograms] = useState<Program[]>(mockStore.getPrograms());
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -45,8 +47,12 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
     try {
       const allProgs = await dataProvider.getPrograms();
       setPrograms(allProgs);
-    } catch {
-      setPrograms(mockStore.getPrograms());
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Unable to load audit data',
+        text2: error?.message || 'Check your connection and try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -56,6 +62,10 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
     refreshData();
   }, [refreshData]);
 
+  useEffect(() => {
+    if (activeArea === 'overview') setActiveTab('pending');
+  }, [activeArea]);
+
   const pendingAudits = programs.filter(p => p.status === 'pending_audit');
   const completedAudits = programs.filter(p => p.status === 'completed' && p.auditorRemarks);
 
@@ -64,7 +74,7 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
     setRemarks(
       `Cold-chain log verified at ${
         prog.completionMetrics?.coldChainTempCelsius || 4.0
-      }°C. Vaccine batch ${
+      }Ã‚Â°C. Vaccine batch ${
         prog.completionMetrics?.batchNumber || 'N/A'
       } meets Ceva standards. Flock viability approved.`
     );
@@ -130,96 +140,99 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabBar}>
-        <View style={styles.tabGroup}>
+    <View className={styles.container}>
+      {activeArea === 'programs' && <View className={styles.tabBar}>
+        <View className={styles.tabGroup}>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'pending' && styles.tabBtnActive]}
+            className={`${styles.tabBtn} ${activeTab === 'pending' ? styles.tabBtnActive : ''}`}
             onPress={() => setActiveTab('pending')}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'pending' && styles.tabBtnTextActive]}>
+            <Text className={`${styles.tabBtnText} ${activeTab === 'pending' ? styles.tabBtnTextActive : ''}`}>
               Pending Review ({pendingAudits.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'completed' && styles.tabBtnActive]}
+            className={`${styles.tabBtn} ${activeTab === 'completed' ? styles.tabBtnActive : ''}`}
             onPress={() => setActiveTab('completed')}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'completed' && styles.tabBtnTextActive]}>
+            <Text className={`${styles.tabBtnText} ${activeTab === 'completed' ? styles.tabBtnTextActive : ''}`}>
               Audited Programs ({completedAudits.length})
             </Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+        <TouchableOpacity className={styles.refreshBtn} onPress={refreshData} disabled={loading}>
           {loading ? (
-            <ActivityIndicator size="small" color="#8B5CF6" />
+            <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
-            <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+            <View className="flex-row items-center gap-1.5">
+              <RefreshCw size={15} color={Colors.primary} />
+              <Text className={styles.refreshBtnText}>Refresh</Text>
+            </View>
           )}
         </TouchableOpacity>
-      </View>
+      </View>}
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerClassName={styles.content}>
         {activeTab === 'pending' ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Programs Awaiting Quality Audit & Sign-off</Text>
+          <View className={styles.section}>
+            <Text className={styles.sectionTitle}>Programs Awaiting Quality Audit & Sign-off</Text>
             {pendingAudits.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>All programs audited! No pending inspections.</Text>
+              <View className={styles.emptyBox}>
+                <Text className={styles.emptyText}>All programs audited! No pending inspections.</Text>
               </View>
             ) : (
               pendingAudits.map(prog => (
-                <View key={prog.id} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>{prog.programName}</Text>
-                    <View style={styles.pendingBadge}>
-                      <Text style={styles.pendingBadgeText}>NEEDS AUDIT</Text>
+                <View key={prog.id} className={styles.card}>
+                  <View className={styles.cardHeader}>
+                    <Text className={styles.cardTitle}>{prog.programName}</Text>
+                    <View className={styles.pendingBadge}>
+                      <Text className={styles.pendingBadgeText}>NEEDS AUDIT</Text>
                     </View>
                   </View>
-                  <Text style={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                  <Text style={styles.cardMeta}>
-                    Controller: {prog.controllerName} • Flock: {prog.flockSize.toLocaleString()} birds
+                  <Text className={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
+                  <Text className={styles.cardMeta}>
+                    Controller: {prog.controllerName} Ã¢â‚¬Â¢ Flock: {prog.flockSize.toLocaleString()} birds
                   </Text>
 
                   {prog.completionMetrics && (
-                    <View style={styles.metricsPreview}>
-                      <Text style={styles.metricsPreviewText}>
-                        Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()} • Batch: {prog.completionMetrics.batchNumber} • Cold-Chain: {prog.completionMetrics.coldChainTempCelsius}°C
+                    <View className={styles.metricsPreview}>
+                      <Text className={styles.metricsPreviewText}>
+                        Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()} Ã¢â‚¬Â¢ Batch: {prog.completionMetrics.batchNumber} Ã¢â‚¬Â¢ Cold-Chain: {prog.completionMetrics.coldChainTempCelsius}Ã‚Â°C
                       </Text>
                     </View>
                   )}
 
                   <TouchableOpacity
-                    style={styles.reviewBtn}
+                    className={styles.reviewBtn}
                     onPress={() => handleOpenAuditModal(prog)}
                   >
-                    <Text style={styles.reviewBtnText}>Inspect & Enter Remarks</Text>
+                    <Text className={styles.reviewBtnText}>Inspect & Enter Remarks</Text>
                   </TouchableOpacity>
                 </View>
               ))
             )}
           </View>
         ) : (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Historical Audits & Remarks Log</Text>
+          <View className={styles.section}>
+            <Text className={styles.sectionTitle}>Historical Audits & Remarks Log</Text>
             {completedAudits.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No completed audits recorded yet.</Text>
+              <View className={styles.emptyBox}>
+                <Text className={styles.emptyText}>No completed audits recorded yet.</Text>
               </View>
             ) : (
               completedAudits.map(prog => (
-                <View key={prog.id} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>{prog.programName}</Text>
-                    <View style={styles.doneBadge}>
-                      <Text style={styles.doneBadgeText}>AUDITED & DONE</Text>
+                <View key={prog.id} className={styles.card}>
+                  <View className={styles.cardHeader}>
+                    <Text className={styles.cardTitle}>{prog.programName}</Text>
+                    <View className={styles.doneBadge}>
+                      <Text className={styles.doneBadgeText}>AUDITED & DONE</Text>
                     </View>
                   </View>
-                  <Text style={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                  <Text style={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
-                  <View style={styles.remarksBox}>
-                    <Text style={styles.remarksText}>"{prog.auditorRemarks}"</Text>
+                  <Text className={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
+                  <Text className={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
+                  <View className={styles.remarksBox}>
+                    <Text className={styles.remarksText}>"{prog.auditorRemarks}"</Text>
                   </View>
                 </View>
               ))
@@ -231,69 +244,66 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
       {/* Review & Sign-Off Modal */}
       {auditingProgram && (
         <Modal visible transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Program Quality Audit Review</Text>
-              <Text style={styles.modalSub}>{auditingProgram.programName}</Text>
+          <View className={styles.modalOverlay}>
+            <View className={styles.modalCard}>
+              <Text className={styles.modalTitle}>Program Quality Audit Review</Text>
+              <Text className={styles.modalSub}>{auditingProgram.programName}</Text>
 
-              <ScrollView style={styles.modalScroll}>
-                <View style={styles.fieldBox}>
-                  <Text style={styles.fieldLabel}>Submitted By Controller:</Text>
-                  <Text style={styles.fieldVal}>{auditingProgram.controllerName}</Text>
-                  <Text style={styles.fieldLabel}>Birds Vaccinated:</Text>
-                  <Text style={styles.fieldVal}>
+              <ScrollView className={styles.modalScroll}>
+                <View className={styles.fieldBox}>
+                  <Text className={styles.fieldLabel}>Submitted By Controller:</Text>
+                  <Text className={styles.fieldVal}>{auditingProgram.controllerName}</Text>
+                  <Text className={styles.fieldLabel}>Birds Vaccinated:</Text>
+                  <Text className={styles.fieldVal}>
                     {auditingProgram.completionMetrics?.birdsVaccinated.toLocaleString() || 'N/A'}
                   </Text>
-                  <Text style={styles.fieldLabel}>Vaccine Batch & Type:</Text>
-                  <Text style={styles.fieldVal}>
+                  <Text className={styles.fieldLabel}>Vaccine Batch & Type:</Text>
+                  <Text className={styles.fieldVal}>
                     {auditingProgram.completionMetrics?.vaccineType} (Batch #{auditingProgram.completionMetrics?.batchNumber})
                   </Text>
-                  <Text style={styles.fieldLabel}>Cold-Chain Log Temperature:</Text>
-                  <Text style={styles.fieldVal}>
-                    {auditingProgram.completionMetrics?.coldChainTempCelsius}°C (Target: 2°C - 8°C)
+                  <Text className={styles.fieldLabel}>Cold-Chain Log Temperature:</Text>
+                  <Text className={styles.fieldVal}>
+                    {auditingProgram.completionMetrics?.coldChainTempCelsius}Ã‚Â°C (Target: 2Ã‚Â°C - 8Ã‚Â°C)
                   </Text>
-                  <Text style={styles.fieldLabel}>Field Observations:</Text>
-                  <Text style={styles.fieldVal}>
+                  <Text className={styles.fieldLabel}>Field Observations:</Text>
+                  <Text className={styles.fieldVal}>
                     {auditingProgram.completionMetrics?.farmFlockObservations}
                   </Text>
                 </View>
 
                 {/* Audit Checklist */}
-                <View style={styles.checklistSection}>
-                  <Text style={styles.checklistTitle}>Verification Checklist:</Text>
+                <View className={styles.checklistSection}>
+                  <Text className={styles.checklistTitle}>Verification Checklist:</Text>
                   {checklist.map((item, idx) => (
                     <TouchableOpacity
                       key={idx}
-                      style={styles.checkItemRow}
+                      className={styles.checkItemRow}
                       onPress={() => toggleChecklistItem(idx)}
                     >
                       <View
-                        style={[
-                          styles.checkbox,
-                          item.passed ? styles.checkboxChecked : styles.checkboxUnchecked,
-                        ]}
+                        className={`${styles.checkbox} ${item.passed ? styles.checkboxChecked : styles.checkboxUnchecked}`}
                       >
-                        <Text style={styles.checkboxText}>{item.passed ? '✓' : ''}</Text>
+                        {item.passed ? <Check size={13} color={Colors.white} strokeWidth={3} /> : null}
                       </View>
-                      <Text style={styles.checkItemText}>{item.item}</Text>
+                      <Text className={styles.checkItemText}>{item.item}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Auditor Remarks & Compliance Notes</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Auditor Remarks & Compliance Notes</Text>
                   <TextInput
-                    style={[styles.input, { height: 70 }]}
+                    className={`${styles.input} h-[70px]`}
                     multiline
                     value={remarks}
                     onChangeText={setRemarks}
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Quality Compliance Score (0 - 100)</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Quality Compliance Score (0 - 100)</Text>
                   <TextInput
-                    style={styles.input}
+                    className={styles.input}
                     value={score}
                     onChangeText={setScore}
                     keyboardType="numeric"
@@ -301,23 +311,26 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
                 </View>
               </ScrollView>
 
-              <View style={styles.modalBtnRow}>
+              <View className={styles.modalBtnRow}>
                 <TouchableOpacity
-                  style={styles.cancelModalBtn}
+                  className={styles.cancelModalBtn}
                   onPress={() => setAuditingProgram(null)}
                   disabled={submitting}
                 >
-                  <Text style={styles.cancelModalBtnText}>Cancel</Text>
+                  <Text className={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.signOffBtn, submitting && styles.btnDisabled]}
+                  className={`${styles.signOffBtn} ${submitting ? styles.btnDisabled : ''}`}
                   onPress={handleSignOffAudit}
                   disabled={submitting}
                 >
                   {submitting ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.signOffBtnText}>Sign Off & Mark Program Done</Text>
+                    <View className="flex-row items-center justify-center gap-2">
+                      <ClipboardCheck size={15} color={Colors.white} />
+                      <Text className={styles.signOffBtnText}>Sign Off & Mark Program Done</Text>
+                    </View>
                   )}
                 </TouchableOpacity>
               </View>
@@ -329,303 +342,59 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  tabGroup: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  tabBtnActive: {
-    backgroundColor: '#8B5CF6',
-  },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  tabBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  refreshBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#FFFFFF',
-  },
-  refreshBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8B5CF6',
-  },
-  content: {
-    padding: 16,
-    maxWidth: 720,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  section: {
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  emptyBox: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 4,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  pendingBadge: {
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  pendingBadgeText: {
-    color: '#6D28D9',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  doneBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  doneBadgeText: {
-    color: '#15803D',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  cardSub: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  cardMeta: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  metricsPreview: {
-    backgroundColor: '#F8FAFC',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 6,
-  },
-  metricsPreviewText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  reviewBtn: {
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  reviewBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  scoreText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#15803D',
-    marginTop: 4,
-  },
-  remarksBox: {
-    backgroundColor: '#F0FDF4',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 6,
-  },
-  remarksText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    color: '#166534',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  modalSub: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 12,
-  },
-  modalScroll: {
-    marginBottom: 16,
-  },
-  fieldBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 14,
-    gap: 2,
-  },
-  fieldLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  fieldVal: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 6,
-  },
-  checklistSection: {
-    backgroundColor: '#FAF5FF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    gap: 8,
-  },
-  checklistTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#6D28D9',
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  checkItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
-  },
-  checkboxUnchecked: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8B4FE',
-  },
-  checkboxText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  checkItemText: {
-    fontSize: 12,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  inputGroup: {
-    gap: 4,
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    backgroundColor: '#FAFAFA',
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  cancelModalBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  cancelModalBtnText: {
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  signOffBtn: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  btnDisabled: {
-    opacity: 0.7,
-  },
-  signOffBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-});
+const styles = {
+  container: 'flex-1 bg-marush-background',
+  tabBar: 'flex-row flex-wrap items-center justify-between border-b border-marush-border bg-white px-4 md:px-7',
+  tabGroup: 'flex-row flex-wrap gap-[18px]',
+  tabBtn: 'border-b-2 border-transparent px-1 py-[15px]',
+  tabBtnActive: 'border-marush-primary',
+  tabBtnText: 'text-[13px] font-semibold text-marush-muted',
+  tabBtnTextActive: 'font-bold text-marush-primary',
+  refreshBtn: 'rounded-lg border border-marush-border bg-white px-3 py-2',
+  refreshBtnText: 'text-xs font-semibold text-marush-primary',
+  content: 'mx-auto w-full max-w-[1200px] p-4 md:p-8',
+  section: 'gap-3',
+  sectionTitle: 'mb-1 text-xl font-bold text-marush-text',
+  emptyBox: 'items-center p-8',
+  emptyText: 'text-[13px] text-marush-muted-light',
+  card: 'gap-1 rounded-[10px] border border-marush-border bg-white p-4',
+  cardHeader: 'flex-row flex-wrap items-start justify-between gap-2',
+  cardTitle: 'min-w-0 flex-1 text-[15px] font-bold text-marush-text',
+  pendingBadge: 'rounded-md bg-marush-subtle px-2 py-1',
+  pendingBadgeText: 'text-[10px] font-extrabold text-marush-primary',
+  doneBadge: 'rounded-md bg-marush-subtle px-2 py-1',
+  doneBadgeText: 'text-[10px] font-extrabold text-marush-primary',
+  cardSub: 'text-[13px] text-marush-muted',
+  cardMeta: 'text-xs text-marush-muted-light',
+  metricsPreview: 'mt-1.5 rounded-md bg-marush-subtle p-2',
+  metricsPreviewText: 'text-[11px] text-marush-muted',
+  reviewBtn: 'mt-2 items-center rounded-lg bg-marush-primary py-2',
+  reviewBtnText: 'text-[13px] font-bold text-white',
+  scoreText: 'mt-1 text-xs font-bold text-marush-primary',
+  remarksBox: 'mt-1.5 rounded-lg bg-marush-subtle p-2.5',
+  remarksText: 'text-xs italic text-marush-primary-dark',
+  modalOverlay: 'flex-1 items-center justify-center bg-black/50 p-4',
+  modalCard: 'max-h-[90%] w-full max-w-[500px] rounded-2xl bg-white p-6',
+  modalTitle: 'text-lg font-extrabold text-marush-primary',
+  modalSub: 'mb-3 text-[13px] text-marush-muted',
+  modalScroll: 'mb-4',
+  fieldBox: 'mb-3.5 gap-0.5 rounded-lg bg-marush-subtle p-3',
+  fieldLabel: 'text-[10px] font-bold uppercase text-marush-muted-light',
+  fieldVal: 'mb-1.5 text-xs font-semibold text-marush-text',
+  checklistSection: 'mb-3.5 gap-2 rounded-lg border border-marush-border bg-marush-subtle p-3',
+  checklistTitle: 'mb-0.5 text-[11px] font-extrabold uppercase text-marush-primary',
+  checkItemRow: 'flex-row items-center gap-2',
+  checkbox: 'h-5 w-5 items-center justify-center rounded border-[1.5px]',
+  checkboxChecked: 'border-marush-primary bg-marush-primary',
+  checkboxUnchecked: 'border-marush-border bg-white',
+  checkItemText: 'flex-1 text-xs text-marush-text',
+  inputGroup: 'mb-2.5 gap-1',
+  label: 'text-xs font-bold text-marush-text',
+  input: 'rounded-lg border border-marush-border bg-marush-background px-3 py-2 text-[13px]',
+  modalBtnRow: 'flex-row flex-wrap justify-end gap-2.5',
+  cancelModalBtn: 'px-3.5 py-2',
+  cancelModalBtnText: 'font-semibold text-marush-muted',
+  signOffBtn: 'min-w-[180px] flex-1 rounded-lg bg-marush-primary px-4 py-2',
+  btnDisabled: 'opacity-70',
+  signOffBtnText: 'font-bold text-white',
+};

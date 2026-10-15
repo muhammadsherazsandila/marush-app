@@ -54,37 +54,6 @@ function getDatabaseUrl() {
   );
 }
 
-function parsePostgresUri(uri) {
-  const prefixMatch = uri.match(/^postgres(?:ql)?:\/\//);
-  if (!prefixMatch) return { connectionString: uri };
-
-  const withoutPrefix = uri.substring(prefixMatch[0].length);
-  const lastAt = withoutPrefix.lastIndexOf('@');
-  if (lastAt === -1) return { connectionString: uri };
-
-  const userInfo = withoutPrefix.substring(0, lastAt);
-  const hostAndDb = withoutPrefix.substring(lastAt + 1);
-
-  const colonIdx = userInfo.indexOf(':');
-  const user = colonIdx !== -1 ? userInfo.substring(0, colonIdx) : userInfo;
-  const password = colonIdx !== -1 ? userInfo.substring(colonIdx + 1) : '';
-
-  const slashIdx = hostAndDb.indexOf('/');
-  const hostAndPort = slashIdx !== -1 ? hostAndDb.substring(0, slashIdx) : hostAndDb;
-  const database = slashIdx !== -1 ? hostAndDb.substring(slashIdx + 1).split('?')[0] : 'postgres';
-
-  const [host, portStr] = hostAndPort.split(':');
-  const port = portStr ? parseInt(portStr, 10) : 5432;
-
-  return {
-    user,
-    password,
-    host,
-    port,
-    database,
-  };
-}
-
 function getDbClient() {
   const connectionString = getDatabaseUrl();
   if (!connectionString) {
@@ -94,13 +63,26 @@ function getDbClient() {
     process.exit(1);
   }
 
-  const parsed = parsePostgresUri(connectionString);
+  const sslOptions = { rejectUnauthorized: true };
+  const configuredCaPath = process.env.DATABASE_SSL_CA_PATH;
+  const defaultCaPath = path.join(ROOT_DIR, 'supabase', 'prod-ca-2021.crt');
+  const caPath = configuredCaPath
+    ? path.resolve(ROOT_DIR, configuredCaPath)
+    : fs.existsSync(defaultCaPath)
+      ? defaultCaPath
+      : null;
+
+  if (caPath) {
+    if (!fs.existsSync(caPath)) {
+      console.error('\nERROR: DATABASE_SSL_CA_PATH does not point to a certificate file.');
+      process.exit(1);
+    }
+    sslOptions.ca = fs.readFileSync(caPath, 'utf8');
+  }
 
   return new Client({
-    ...parsed,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    connectionString,
+    ssl: sslOptions,
   });
 }
 

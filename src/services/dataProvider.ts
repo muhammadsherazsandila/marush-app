@@ -1,207 +1,108 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as AuthSession from "expo-auth-session";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
+import { Platform } from "react-native";
 import type {
+  AuditChecklistItem,
+  Database,
+  Program,
+  ProgramAudit,
+  ProgramCompletionMetrics,
+  ProgramMemberHistory,
+  ProgramMemberRole,
   UserProfile,
   UserRole,
   UserStatus,
-  Program,
-  ProgramStatus,
-  ProgramCompletionMetrics,
-  ProgramMember,
-  ProgramMemberRole,
-  ProgramAudit,
-  AuditChecklistItem,
-  ProgramMemberHistory,
-  Database,
-} from '../types';
+} from "../types";
+import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
 
-// ==========================================
-// SEEDED DEMO DATA STORE (In-Memory Fallback)
-// ==========================================
+WebBrowser.maybeCompleteAuthSession();
 
-const INITIAL_USERS: UserProfile[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000001',
-    email: 'admin@marush.com.pk',
-    fullName: 'Muhammad Sheraz (Administrator)',
-    role: 'admin',
-    status: 'approved',
-    phone: '+92 42 111 627 874',
-    employeeCode: 'MRSH-ADM-001',
-    createdAt: '2026-01-15T08:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000002',
-    email: 'controller@marush.com.pk',
-    fullName: 'Dr. Tariq Mahmood (Field Controller)',
-    role: 'program_controller',
-    status: 'approved',
-    phone: '+92 300 4567890',
-    employeeCode: 'MRSH-CTL-012',
-    createdAt: '2026-02-01T09:30:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000003',
-    email: 'auditor@marush.com.pk',
-    fullName: 'Dr. Ayesha Malik (Quality Auditor)',
-    role: 'program_auditor',
-    status: 'approved',
-    phone: '+92 321 9876543',
-    employeeCode: 'MRSH-AUD-004',
-    createdAt: '2026-02-10T11:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000004',
-    email: 'ali.hassan@marush.com.pk',
-    fullName: 'Ali Hassan',
-    role: 'employee',
-    status: 'approved',
-    phone: '+92 312 3456781',
-    employeeCode: 'MRSH-EMP-101',
-    createdAt: '2026-03-01T10:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000005',
-    email: 'usman.zafar@marush.com.pk',
-    fullName: 'Usman Zafar',
-    role: 'employee',
-    status: 'approved',
-    phone: '+92 312 3456782',
-    employeeCode: 'MRSH-EMP-102',
-    createdAt: '2026-03-02T10:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000006',
-    email: 'bilal.ahmed@marush.com.pk',
-    fullName: 'Bilal Ahmed',
-    role: 'employee',
-    status: 'approved',
-    phone: '+92 312 3456783',
-    employeeCode: 'MRSH-EMP-103',
-    createdAt: '2026-03-03T10:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000007',
-    email: 'hamza.khan@marush.com.pk',
-    fullName: 'Hamza Khan (Pending Approval)',
-    role: 'employee',
-    status: 'pending',
-    phone: '+92 312 3456784',
-    employeeCode: 'MRSH-EMP-104',
-    createdAt: '2026-10-10T09:15:00Z',
-  },
+const REQUESTED_ROLE_KEY = "marush.requested-role";
+type RequestedDesignation = Exclude<UserRole, "admin">;
+const REQUESTABLE_DESIGNATIONS: RequestedDesignation[] = [
+  "employee",
+  "program_controller",
+  "program_auditor",
 ];
 
-const INITIAL_PROGRAMS: Program[] = [
-  {
-    id: '10000000-0000-0000-0000-000000000001',
-    programName: 'Hatchery Ceva ND In-Ovo Vaccination',
-    hatcheryOrFarmName: 'Big Bird Hatcheries - Unit 4, Raiwind',
-    flockSize: 50000,
-    scheduledStartDate: '2026-09-18',
-    scheduledStartTime: '08:00 AM',
-    scheduledEndDate: '2026-09-18',
-    scheduledEndTime: '04:00 PM',
-    status: 'completed',
-    controllerId: '00000000-0000-0000-0000-000000000002',
-    controllerName: 'Dr. Tariq Mahmood (Field Controller)',
-    teamMemberIds: ['00000000-0000-0000-0000-000000000004'],
-    auditorId: '00000000-0000-0000-0000-000000000003',
-    auditorName: 'Dr. Ayesha Malik (Quality Auditor)',
-    completionMetrics: {
-      birdsVaccinated: 49820,
-      dosagePerBird: '0.05 ml via automated Ceva Egginject',
-      batchNumber: 'VND-2026-PK98',
-      vaccineType: 'Vectormune ND + Cevac Transmune',
-      coldChainTempCelsius: 3.8,
-      equipmentCheckPassed: true,
-      farmFlockObservations: 'Optimal egg viability. Strict aseptic standards maintained throughout.',
-    },
-    completedAt: '2026-09-18T16:30:00Z',
-    auditorRemarks: 'Excellent execution. Cold chain log verified at 3.8°C. Equipment sanitized per Ceva SOP.',
-    auditScore: 98,
-    auditedAt: '2026-09-19T09:00:00Z',
-    createdAt: '2026-09-15T10:00:00Z',
-  },
-  {
-    id: '10000000-0000-0000-0000-000000000002',
-    programName: 'Broiler Flock Day-One Spray Vaccination',
-    hatcheryOrFarmName: 'Jadeed Farms - Flock Sector B, Okara',
-    flockSize: 35000,
-    scheduledStartDate: '2026-10-08',
-    scheduledStartTime: '07:30 AM',
-    scheduledEndDate: '2026-10-08',
-    scheduledEndTime: '01:00 PM',
-    status: 'completed',
-    controllerId: '00000000-0000-0000-0000-000000000002',
-    controllerName: 'Dr. Tariq Mahmood (Field Controller)',
-    teamMemberIds: ['00000000-0000-0000-0000-000000000005'],
-    auditorId: '00000000-0000-0000-0000-000000000003',
-    auditorName: 'Dr. Ayesha Malik (Quality Auditor)',
-    completionMetrics: {
-      birdsVaccinated: 34950,
-      dosagePerBird: 'Coarse spray 20ml per crate',
-      batchNumber: 'CIB-5441-A',
-      vaccineType: 'Cevac IBird',
-      coldChainTempCelsius: 4.1,
-      equipmentCheckPassed: true,
-      farmFlockObservations: 'Flock lively. Droplet size calibrated at 150 microns.',
-    },
-    completedAt: '2026-10-08T13:45:00Z',
-    auditorRemarks: 'Spray uniformity compliant. Vaccine titration confirmed post-application.',
-    auditScore: 95,
-    auditedAt: '2026-10-09T10:30:00Z',
-    createdAt: '2026-10-05T11:00:00Z',
-  },
-  {
-    id: '10000000-0000-0000-0000-000000000003',
-    programName: 'Layer Flock Marek & Gumboro Immunization',
-    hatcheryOrFarmName: 'SB Feeds & Poultry - Kasur Hatchery',
-    flockSize: 28000,
-    scheduledStartDate: '2026-10-10',
-    scheduledStartTime: '09:00 AM',
-    scheduledEndDate: '2026-10-10',
-    scheduledEndTime: '05:00 PM',
-    status: 'active',
-    controllerId: '00000000-0000-0000-0000-000000000002',
-    controllerName: 'Dr. Tariq Mahmood (Field Controller)',
-    teamMemberIds: ['00000000-0000-0000-0000-000000000004'],
-    auditorId: '00000000-0000-0000-0000-000000000003',
-    auditorName: 'Dr. Ayesha Malik (Quality Auditor)',
-    createdAt: '2026-10-09T14:00:00Z',
-  },
-];
+const saveRequestedRole = async (role: RequestedDesignation) => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.sessionStorage.setItem(REQUESTED_ROLE_KEY, role);
+    return;
+  }
+  await AsyncStorage.setItem(REQUESTED_ROLE_KEY, role);
+};
 
-let usersDb: UserProfile[] = [...INITIAL_USERS];
-let programsDb: Program[] = [...INITIAL_PROGRAMS];
+const readRequestedRole = async (): Promise<RequestedDesignation | null> => {
+  const value =
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? window.sessionStorage.getItem(REQUESTED_ROLE_KEY)
+      : await AsyncStorage.getItem(REQUESTED_ROLE_KEY);
+  return REQUESTABLE_DESIGNATIONS.includes(value as RequestedDesignation)
+    ? (value as RequestedDesignation)
+    : null;
+};
+
+const clearRequestedRole = async () => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.sessionStorage.removeItem(REQUESTED_ROLE_KEY);
+    return;
+  }
+  await AsyncStorage.removeItem(REQUESTED_ROLE_KEY);
+};
+
+const backendFailure = <T>(_getValue: () => T, backendMessage?: string): T => {
+  throw new Error(
+    isSupabaseConfigured
+      ? backendMessage ||
+          "The request could not be completed. Check your connection and try again."
+      : "The application service is not configured. Contact your administrator.",
+  );
+};
+
+// ==========================================
+// In-memory compatibility store (production data always comes from Supabase)
+// ==========================================
+
+let usersDb: UserProfile[] = [];
+let programsDb: Program[] = [];
 let currentSessionUser: UserProfile | null = null;
 
 // ==========================================
 // MOCK STORE (Direct synchronous helper)
 // ==========================================
-export const mockStore = {
+const mockStore = {
   getUsers: (): UserProfile[] => [...usersDb],
 
-  getUserById: (id: string): UserProfile | undefined => usersDb.find(u => u.id === id),
+  getUserById: (id: string): UserProfile | undefined =>
+    usersDb.find((u) => u.id === id),
 
-  addUser: (user: Omit<UserProfile, 'id' | 'createdAt'>): UserProfile => {
+  addUser: (user: Omit<UserProfile, "id" | "createdAt">): UserProfile => {
     const newUser: UserProfile = {
       ...user,
-      id: '00000000-0000-0000-0000-' + Math.random().toString(16).substring(2, 14).padEnd(12, '0'),
+      id:
+        "00000000-0000-0000-0000-" +
+        Math.random().toString(16).substring(2, 14).padEnd(12, "0"),
       createdAt: new Date().toISOString(),
     };
     usersDb.push(newUser);
     return newUser;
   },
 
-  updateUserStatus: (id: string, status: UserProfile['status']): UserProfile | null => {
-    const idx = usersDb.findIndex(u => u.id === id);
+  updateUserStatus: (
+    id: string,
+    status: UserProfile["status"],
+  ): UserProfile | null => {
+    const idx = usersDb.findIndex((u) => u.id === id);
     if (idx === -1) return null;
     usersDb[idx] = { ...usersDb[idx], status };
     return usersDb[idx];
   },
 
   updateUserRole: (id: string, role: UserRole): UserProfile | null => {
-    const idx = usersDb.findIndex(u => u.id === id);
+    const idx = usersDb.findIndex((u) => u.id === id);
     if (idx === -1) return null;
     usersDb[idx] = { ...usersDb[idx], role };
     return usersDb[idx];
@@ -209,15 +110,17 @@ export const mockStore = {
 
   deleteUser: (id: string): boolean => {
     const lenBefore = usersDb.length;
-    usersDb = usersDb.filter(u => u.id !== id);
+    usersDb = usersDb.filter((u) => u.id !== id);
     return usersDb.length < lenBefore;
   },
 
   getActiveEmployeeIds: (): string[] => {
-    const activePrograms = programsDb.filter(p => p.status === 'active' || p.status === 'pending_audit');
+    const activePrograms = programsDb.filter(
+      (p) => p.status === "active" || p.status === "pending_audit",
+    );
     const occupiedIds = new Set<string>();
-    activePrograms.forEach(p => {
-      p.teamMemberIds.forEach(id => occupiedIds.add(id));
+    activePrograms.forEach((p) => {
+      p.teamMemberIds.forEach((id) => occupiedIds.add(id));
       occupiedIds.add(p.controllerId);
     });
     return Array.from(occupiedIds);
@@ -226,58 +129,74 @@ export const mockStore = {
   getAvailableEmployees: (): UserProfile[] => {
     const occupied = new Set(mockStore.getActiveEmployeeIds());
     return usersDb.filter(
-      u => (u.role === 'employee' || u.role === 'program_controller') &&
-           u.status === 'approved' &&
-           !occupied.has(u.id)
+      (u) =>
+        (u.role === "employee" || u.role === "program_controller") &&
+        u.status === "approved" &&
+        !occupied.has(u.id),
     );
   },
 
   getPrograms: (): Program[] => [...programsDb],
 
-  getProgramById: (id: string): Program | undefined => programsDb.find(p => p.id === id),
+  getProgramById: (id: string): Program | undefined =>
+    programsDb.find((p) => p.id === id),
 
-  createProgram: (programData: Omit<Program, 'id' | 'createdAt' | 'status'>): Program => {
+  createProgram: (
+    programData: Omit<Program, "id" | "createdAt" | "status">,
+  ): Program => {
     const newProg: Program = {
       ...programData,
-      id: '10000000-0000-0000-0000-' + Math.random().toString(16).substring(2, 14).padEnd(12, '0'),
-      status: 'pending_approval',
+      id:
+        "10000000-0000-0000-0000-" +
+        Math.random().toString(16).substring(2, 14).padEnd(12, "0"),
+      status: "pending_approval",
       createdAt: new Date().toISOString(),
     };
     programsDb.unshift(newProg);
     return newProg;
   },
 
-  approveProgramAndStart: (programId: string, auditorId: string): Program | null => {
-    const idx = programsDb.findIndex(p => p.id === programId);
+  approveProgramAndStart: (
+    programId: string,
+    auditorId: string,
+  ): Program | null => {
+    const idx = programsDb.findIndex((p) => p.id === programId);
     if (idx === -1) return null;
-    const auditor = usersDb.find(u => u.id === auditorId);
+    const auditor = usersDb.find((u) => u.id === auditorId);
     programsDb[idx] = {
       ...programsDb[idx],
-      status: 'active',
+      status: "active",
       auditorId,
-      auditorName: auditor?.fullName || 'Assigned Auditor',
+      auditorName: auditor?.fullName || "Assigned Auditor",
     };
     return programsDb[idx];
   },
 
-  submitProgramCompletion: (programId: string, metrics: Program['completionMetrics']): Program | null => {
-    const idx = programsDb.findIndex(p => p.id === programId);
+  submitProgramCompletion: (
+    programId: string,
+    metrics: Program["completionMetrics"],
+  ): Program | null => {
+    const idx = programsDb.findIndex((p) => p.id === programId);
     if (idx === -1) return null;
     programsDb[idx] = {
       ...programsDb[idx],
-      status: 'pending_audit',
+      status: "pending_audit",
       completionMetrics: metrics,
       completedAt: new Date().toISOString(),
     };
     return programsDb[idx];
   },
 
-  submitAuditorRemarks: (programId: string, remarks: string, score: number = 95): Program | null => {
-    const idx = programsDb.findIndex(p => p.id === programId);
+  submitAuditorRemarks: (
+    programId: string,
+    remarks: string,
+    score: number = 95,
+  ): Program | null => {
+    const idx = programsDb.findIndex((p) => p.id === programId);
     if (idx === -1) return null;
     programsDb[idx] = {
       ...programsDb[idx],
-      status: 'completed',
+      status: "completed",
       auditorRemarks: remarks,
       auditScore: score,
       auditedAt: new Date().toISOString(),
@@ -296,13 +215,16 @@ export const mockStore = {
 // ROW MAPPERS (Supabase snake_case -> App camelCase)
 // ==========================================
 
-function mapProfileRow(row: Database['public']['Tables']['profiles']['Row']): UserProfile {
+function mapProfileRow(
+  row: Database["public"]["Tables"]["profiles"]["Row"],
+): UserProfile {
   return {
     id: row.id,
     authUserId: row.auth_user_id || undefined,
     email: row.email,
     fullName: row.full_name,
     role: row.role,
+    requestedRole: row.requested_role || undefined,
     status: row.status,
     phone: row.phone || undefined,
     employeeCode: row.employee_code || undefined,
@@ -329,7 +251,7 @@ function mapProgramRow(row: any): Program {
     auditorName: row.auditor?.full_name,
     teamMemberIds: (row.program_members || []).map((m: any) => m.user_id),
     teamMembers: (row.program_members || [])
-      .map((m: any) => m.user ? mapProfileRow(m.user) : undefined)
+      .map((m: any) => (m.user ? mapProfileRow(m.user) : undefined))
       .filter(Boolean),
     completionMetrics: row.completion_metrics || undefined,
     completedAt: row.completed_at || undefined,
@@ -347,110 +269,168 @@ function mapProgramRow(row: any): Program {
 
 export const dataProvider = {
   // --- Auth ---
-  signInWithEmail: async (
-    email: string,
-    password: string
-  ): Promise<{ user: UserProfile | null; error: string | null }> => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error || !data.user) {
-        return { user: null, error: error?.message || 'Authentication failed' };
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('auth_user_id', data.user.id)
-        .single();
-      if (!profile) return { user: null, error: 'User profile not found' };
+  syncProfileForAuthUser: async (authUser: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, any>;
+  }): Promise<UserProfile | null> => {
+    if (!isSupabaseConfigured) return null;
+
+    // The auth.users trigger creates and links profiles. Clients may read only
+    // the signed-in user's profile and cannot link or create profiles directly.
+    const { data: profile } = await getSupabaseClient()
+      .from("profiles")
+      .select("*")
+      .eq("auth_user_id", authUser.id)
+      .maybeSingle();
+
+    if (profile) {
       const user = mapProfileRow(profile);
+      if (user.status === "pending") {
+        const requestedRole = await readRequestedRole();
+        if (requestedRole) {
+          const { error } = await getSupabaseClient().rpc(
+            "request_profile_designation",
+            {
+              p_requested_role: requestedRole,
+            },
+          );
+          if (error) {
+            console.error(
+              "[Auth] Could not save requested designation:",
+              error.message,
+            );
+          } else {
+            user.requestedRole = requestedRole;
+            await clearRequestedRole();
+          }
+        }
+      } else {
+        await clearRequestedRole();
+      }
       mockStore.setCurrentUser(user);
-      return { user, error: null };
+      return user;
     }
 
-    const user = mockStore.getUsers().find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (user) {
-      mockStore.setCurrentUser(user);
-      return { user, error: null };
-    }
-    return { user: null, error: 'Invalid email or password' };
+    return null;
   },
 
-  signUpWithEmail: async (
-    email: string,
-    password: string,
-    profileData: { fullName: string; role: UserRole; phone?: string; employeeCode?: string }
+  signInWithGoogle: async (
+    requestedRole: RequestedDesignation = "employee",
   ): Promise<{ user: UserProfile | null; error: string | null }> => {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: profileData.fullName,
-            role: profileData.role,
+      try {
+        await saveRequestedRole(requestedRole);
+        // Start OAuth through Supabase so its PKCE verifier and GoTrue session
+        // remain authoritative on both web and native platforms.
+        const isWeb = Platform.OS === "web" && typeof window !== "undefined";
+        const configuredWebRedirectUrl =
+          process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL?.trim();
+        const nativeRedirectUrl = Linking.createURL("auth/callback", {
+          scheme: "marushapp",
+        });
+        const redirectUrl = isWeb
+          ? configuredWebRedirectUrl || window.location.origin
+          : nativeRedirectUrl || AuthSession.makeRedirectUri({
+              scheme: "marushapp",
+              path: "auth/callback",
+              preferLocalhost: false,
+            });
+
+        if (__DEV__) {
+          console.info("[Auth] OAuth redirect URI:", redirectUrl);
+        }
+
+        const { data, error } = await getSupabaseClient().auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: redirectUrl,
+            queryParams: {
+              access_type: "offline",
+              prompt: "consent",
+            },
           },
-        },
-      });
-      if (error || !data.user) {
-        return { user: null, error: error?.message || 'Registration failed' };
+        });
+
+        if (error) {
+          console.error("[Auth] Google OAuth error:", error.message);
+          return { user: null, error: error.message };
+        }
+
+        // On Web: redirect current window to Google OAuth page
+        if (isWeb && data?.url && typeof window !== "undefined") {
+          window.location.href = data.url;
+          return { user: null, error: null };
+        }
+
+        // On Native, Expo AuthSession supplies the app deep link and Expo's
+        // browser auth session returns the OAuth code to the GoTrue client.
+        if (data?.url) {
+          if (__DEV__) {
+            const requestedRedirect = new URL(data.url).searchParams.get("redirect_to");
+            console.info("[Auth] Supabase OAuth redirect_to:", requestedRedirect || "not present");
+          }
+          const authResult = await WebBrowser.openAuthSessionAsync(
+            data.url,
+            redirectUrl,
+            {
+              showInRecents: false,
+              createTask: false,
+            },
+          );
+
+          if (authResult.type !== "success") {
+            return { user: null, error: null };
+          }
+
+          const callbackUrl = new URL(authResult.url);
+          const code = callbackUrl.searchParams.get("code");
+          if (!code) {
+            const oauthError =
+              callbackUrl.searchParams.get("error_description") ||
+              callbackUrl.searchParams.get("error");
+            if (oauthError) return { user: null, error: oauthError };
+            return {
+              user: null,
+              error:
+                "Google sign-in returned without an authorization code. Please try again.",
+            };
+          }
+
+          const { data: sessionData, error: sessionErr } =
+            await getSupabaseClient().auth.exchangeCodeForSession(code);
+          if (sessionErr) {
+            return { user: null, error: sessionErr.message };
+          }
+
+          if (sessionData?.user) {
+            const user = await dataProvider.syncProfileForAuthUser(
+              sessionData.user,
+            );
+            return { user, error: null };
+          }
+        }
+
+        return { user: null, error: null };
+      } catch (err: any) {
+        console.error("[Auth] Google OAuth exception:", err);
+        return {
+          user: null,
+          error: err?.message || "Failed to authenticate with Google",
+        };
       }
-
-      const { data: newProfile, error: profileErr } = await supabase
-        .from('profiles')
-        .insert({
-          auth_user_id: data.user.id,
-          email,
-          full_name: profileData.fullName,
-          role: profileData.role,
-          status: 'pending',
-          phone: profileData.phone || null,
-          employee_code: profileData.employeeCode || null,
-        })
-        .select()
-        .single();
-
-      if (profileErr || !newProfile) {
-        return { user: null, error: profileErr?.message || 'Failed to create profile' };
-      }
-
-      const user = mapProfileRow(newProfile);
-      mockStore.setCurrentUser(user);
-      return { user, error: null };
     }
 
-    const existing = mockStore.getUsers().find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (existing) {
-      return { user: null, error: 'An account with this email already exists' };
-    }
-    const newUser = mockStore.addUser({
-      email: email.trim(),
-      fullName: profileData.fullName.trim(),
-      role: profileData.role,
-      status: 'pending',
-      phone: profileData.phone?.trim(),
-      employeeCode: profileData.employeeCode?.trim(),
-    });
-    mockStore.setCurrentUser(newUser);
-    return { user: newUser, error: null };
-  },
-
-  signInWithGoogle: async (): Promise<{ error: string | null }> => {
-    if (isSupabaseConfigured) {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: 'marushapp://auth/callback' },
-      });
-      return { error: error?.message || null };
-    }
-    // Mock Google sign-in defaults to admin
-    const admin = mockStore.getUsers()[0];
-    mockStore.setCurrentUser(admin);
-    return { error: null };
+    return {
+      user: null,
+      error:
+        "The application service is not configured. Contact your administrator.",
+    };
   },
 
   signOut: async (): Promise<void> => {
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
+      await getSupabaseClient().auth.signOut();
     }
     mockStore.setCurrentUser(null);
   },
@@ -462,33 +442,50 @@ export const dataProvider = {
   // --- Users / Profiles ---
   getUsers: async (): Promise<UserProfile[]> => {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: true });
-      if (error || !data) return mockStore.getUsers();
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error || !data)
+        return backendFailure(() => mockStore.getUsers(), error?.message);
       return data.map(mapProfileRow);
     }
-    return mockStore.getUsers();
+    return backendFailure(() => mockStore.getUsers());
   },
 
   getUserById: async (id: string): Promise<UserProfile | null> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
       return data ? mapProfileRow(data) : null;
     }
-    return mockStore.getUserById(id) || null;
+    return backendFailure(() => mockStore.getUserById(id) || null);
   },
 
   getUsersByRole: async (role: UserRole): Promise<UserProfile[]> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase.from('profiles').select('*').eq('role', role);
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
+        .select("*")
+        .eq("role", role);
+      if (error) throw new Error(error.message);
       return (data || []).map(mapProfileRow);
     }
-    return mockStore.getUsers().filter(u => u.role === role);
+    return backendFailure(() =>
+      mockStore.getUsers().filter((u) => u.role === role),
+    );
   },
 
-  addUser: async (user: Omit<UserProfile, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserProfile> => {
+  addUser: async (
+    user: Omit<UserProfile, "id" | "createdAt" | "updatedAt">,
+  ): Promise<UserProfile> => {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
         .insert({
           email: user.email,
           full_name: user.fullName,
@@ -500,145 +497,219 @@ export const dataProvider = {
         })
         .select()
         .single();
+      if (error) throw new Error(error.message);
       if (data) return mapProfileRow(data);
     }
-    return mockStore.addUser(user);
+    return backendFailure(() => mockStore.addUser(user));
   },
 
-  updateUserStatus: async (id: string, status: UserStatus): Promise<UserProfile | null> => {
+  updateUserStatus: async (
+    id: string,
+    status: UserStatus,
+  ): Promise<UserProfile | null> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase.from('profiles').update({ status }).eq('id', id).select().single();
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
+        .update({ status })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
       if (data) return mapProfileRow(data);
     }
-    return mockStore.updateUserStatus(id, status);
+    return backendFailure(() => mockStore.updateUserStatus(id, status));
   },
 
-  updateUserRole: async (id: string, role: UserRole): Promise<UserProfile | null> => {
+  updateUserRole: async (
+    id: string,
+    role: UserRole,
+  ): Promise<UserProfile | null> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase.from('profiles').update({ role }).eq('id', id).select().single();
+      const { data: targetUser } = await getSupabaseClient()
+        .from("profiles")
+        .select("role")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (targetUser?.role === "admin" && role !== "admin") {
+        throw new Error("Administrator role cannot be changed. Contact the developer for assistance.");
+      }
+
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
+        .update({ role })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
       if (data) return mapProfileRow(data);
     }
-    return mockStore.updateUserRole(id, role);
+    const target = mockStore.getUserById(id);
+    if (target?.role === "admin" && role !== "admin") {
+      throw new Error("Administrator role cannot be changed. Contact the developer for assistance.");
+    }
+    return backendFailure(() => mockStore.updateUserRole(id, role));
   },
 
   getPendingUsers: async (): Promise<UserProfile[]> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase.from('profiles').select('*').eq('status', 'pending');
+      const { data, error } = await getSupabaseClient()
+        .from("profiles")
+        .select("*")
+        .eq("status", "pending");
+      if (error) throw new Error(error.message);
       return (data || []).map(mapProfileRow);
     }
-    return mockStore.getUsers().filter(u => u.status === 'pending');
+    return backendFailure(() =>
+      mockStore.getUsers().filter((u) => u.status === "pending"),
+    );
   },
 
   deleteUser: async (id: string): Promise<boolean> => {
     if (isSupabaseConfigured) {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      // Guard: fetch profile to check if it's an admin before attempting delete
+      const { data: targetUser } = await getSupabaseClient()
+        .from("profiles")
+        .select("role, email")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (targetUser?.role === "admin") {
+        throw new Error("Administrator accounts cannot be deleted. Contact the developer for assistance.");
+      }
+
+      const { error } = await getSupabaseClient()
+        .from("profiles")
+        .delete()
+        .eq("id", id);
+      if (error) throw new Error(error.message);
       return !error;
     }
-    return mockStore.deleteUser(id);
+    const target = mockStore.getUserById(id);
+    if (target?.role === "admin") {
+      throw new Error("Administrator accounts cannot be deleted. Contact the developer for assistance.");
+    }
+    return backendFailure(() => mockStore.deleteUser(id));
   },
 
   // --- Programs ---
   getPrograms: async (): Promise<Program[]> => {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('programs')
-        .select(`
+      const { data, error } = await getSupabaseClient()
+        .from("programs")
+        .select(
+          `
           *,
           controller:profiles!programs_controller_id_fkey(full_name),
           auditor:profiles!programs_auditor_id_fkey(full_name),
           program_members(user_id, role_in_program, user:profiles(*))
-        `)
-        .order('created_at', { ascending: false });
-      if (error || !data) return mockStore.getPrograms();
+        `,
+        )
+        .order("created_at", { ascending: false });
+      if (error || !data)
+        return backendFailure(() => mockStore.getPrograms(), error?.message);
       return data.map(mapProgramRow);
     }
-    return mockStore.getPrograms();
+    return backendFailure(() => mockStore.getPrograms());
   },
 
   getProgramById: async (id: string): Promise<Program | null> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase
-        .from('programs')
-        .select(`
+      const { data, error } = await getSupabaseClient()
+        .from("programs")
+        .select(
+          `
           *,
           controller:profiles!programs_controller_id_fkey(full_name),
           auditor:profiles!programs_auditor_id_fkey(full_name),
           program_members(user_id, role_in_program, user:profiles(*))
-        `)
-        .eq('id', id)
-        .single();
+        `,
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
       return data ? mapProgramRow(data) : null;
     }
-    return mockStore.getProgramById(id) || null;
+    return backendFailure(() => mockStore.getProgramById(id) || null);
   },
 
   createProgram: async (
-    data: Omit<Program, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'teamMembers' | 'controllerName' | 'auditorName'>
+    data: Omit<
+      Program,
+      | "id"
+      | "createdAt"
+      | "updatedAt"
+      | "status"
+      | "teamMembers"
+      | "controllerName"
+      | "auditorName"
+    >,
   ): Promise<Program> => {
     if (isSupabaseConfigured) {
-      const { data: newRow, error } = await supabase
-        .from('programs')
-        .insert({
-          program_name: data.programName,
-          hatchery_or_farm_name: data.hatcheryOrFarmName,
-          flock_size: data.flockSize,
-          scheduled_start_date: data.scheduledStartDate,
-          scheduled_start_time: data.scheduledStartTime,
-          scheduled_end_date: data.scheduledEndDate,
-          scheduled_end_time: data.scheduledEndTime,
-          controller_id: data.controllerId,
-          status: 'pending_approval',
-        })
-        .select()
-        .single();
-
-      if (newRow) {
-        // Add members
-        if (data.teamMemberIds && data.teamMemberIds.length > 0) {
-          const memberRows = data.teamMemberIds.map(uid => ({
-            program_id: newRow.id,
-            user_id: uid,
-            role_in_program: 'team_member',
-          }));
-          await supabase.from('program_members').insert(memberRows);
-        }
-        return mapProgramRow(newRow);
-      }
+      const { data: programId, error } = await getSupabaseClient().rpc(
+        "create_program_with_members",
+        {
+          p_program_name: data.programName,
+          p_hatchery_or_farm_name: data.hatcheryOrFarmName,
+          p_flock_size: data.flockSize,
+          p_scheduled_start_date: data.scheduledStartDate,
+          p_scheduled_start_time: data.scheduledStartTime,
+          p_scheduled_end_date: data.scheduledEndDate,
+          p_scheduled_end_time: data.scheduledEndTime,
+          p_controller_id: data.controllerId,
+          p_team_member_ids: data.teamMemberIds || [],
+        },
+      );
+      if (error) throw new Error(error.message);
+      if (!programId) throw new Error("The program could not be created.");
+      const createdProgram = await dataProvider.getProgramById(programId);
+      if (!createdProgram)
+        throw new Error("The program was created but could not be loaded.");
+      return createdProgram;
     }
-    return mockStore.createProgram(data);
+    return backendFailure(() => mockStore.createProgram(data));
   },
 
-  approveProgramAndStart: async (programId: string, auditorId: string): Promise<Program | null> => {
+  approveProgramAndStart: async (
+    programId: string,
+    auditorId: string,
+  ): Promise<Program | null> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase
-        .from('programs')
-        .update({ status: 'active', auditor_id: auditorId })
-        .eq('id', programId)
+      const { data, error } = await getSupabaseClient()
+        .from("programs")
+        .update({ status: "active", auditor_id: auditorId })
+        .eq("id", programId)
         .select()
-        .single();
+        .maybeSingle();
+      if (error) throw new Error(error.message);
       if (data) return mapProgramRow(data);
     }
-    return mockStore.approveProgramAndStart(programId, auditorId);
+    return backendFailure(() =>
+      mockStore.approveProgramAndStart(programId, auditorId),
+    );
   },
 
   submitProgramCompletion: async (
     programId: string,
-    metrics: ProgramCompletionMetrics
+    metrics: ProgramCompletionMetrics,
   ): Promise<Program | null> => {
     if (isSupabaseConfigured) {
-      const { data } = await supabase
-        .from('programs')
+      const { data, error } = await getSupabaseClient()
+        .from("programs")
         .update({
-          status: 'pending_audit',
+          status: "pending_audit",
           completion_metrics: metrics,
           completed_at: new Date().toISOString(),
         })
-        .eq('id', programId)
+        .eq("id", programId)
         .select()
-        .single();
+        .maybeSingle();
+      if (error) throw new Error(error.message);
       if (data) return mapProgramRow(data);
     }
-    return mockStore.submitProgramCompletion(programId, metrics);
+    return backendFailure(() =>
+      mockStore.submitProgramCompletion(programId, metrics),
+    );
   },
 
   submitAuditRemarks: async (
@@ -646,32 +717,19 @@ export const dataProvider = {
     auditorId: string,
     remarks: string,
     score: number = 95,
-    checklist?: AuditChecklistItem[]
+    checklist?: AuditChecklistItem[],
   ): Promise<ProgramAudit | null> => {
     if (isSupabaseConfigured) {
-      const now = new Date().toISOString();
-      await supabase
-        .from('programs')
-        .update({
-          status: 'completed',
-          auditor_remarks: remarks,
-          audit_score: score,
-          audited_at: now,
-        })
-        .eq('id', programId);
-
-      const { data: auditRow } = await supabase
-        .from('program_audits')
-        .insert({
-          program_id: programId,
-          auditor_id: auditorId,
-          remarks,
-          score,
-          checklist: checklist || [],
-          signed_off_at: now,
-        })
-        .select()
-        .single();
+      const { data: auditRows, error: auditError } =
+        await getSupabaseClient().rpc("submit_program_audit", {
+          p_program_id: programId,
+          p_auditor_id: auditorId,
+          p_remarks: remarks,
+          p_score: score,
+          p_checklist: checklist || [],
+        });
+      if (auditError) throw new Error(auditError.message);
+      const auditRow = auditRows?.[0];
 
       if (auditRow) {
         return {
@@ -688,9 +746,11 @@ export const dataProvider = {
       }
     }
 
-    mockStore.submitAuditorRemarks(programId, remarks, score);
+    backendFailure(() =>
+      mockStore.submitAuditorRemarks(programId, remarks, score),
+    );
     return {
-      id: 'audit-' + Math.random().toString(36).substring(2, 9),
+      id: "audit-" + Math.random().toString(36).substring(2, 9),
       programId,
       auditorId,
       checklist: checklist || [],
@@ -704,10 +764,11 @@ export const dataProvider = {
   // --- Dynamic Availability Filter ---
   getActiveEmployeeIds: async (): Promise<string[]> => {
     if (isSupabaseConfigured) {
-      const { data: activeProgs } = await supabase
-        .from('programs')
-        .select('id, controller_id, program_members(user_id)')
-        .in('status', ['active', 'pending_audit']);
+      const { data: activeProgs, error } = await getSupabaseClient()
+        .from("programs")
+        .select("id, controller_id, program_members(user_id)")
+        .in("status", ["active", "pending_audit"]);
+      if (error) throw new Error(error.message);
       const occupied = new Set<string>();
       (activeProgs || []).forEach((p: any) => {
         occupied.add(p.controller_id);
@@ -715,37 +776,53 @@ export const dataProvider = {
       });
       return Array.from(occupied);
     }
-    return mockStore.getActiveEmployeeIds();
+    return backendFailure(() => mockStore.getActiveEmployeeIds());
   },
 
   getAvailableEmployees: async (): Promise<UserProfile[]> => {
     if (isSupabaseConfigured) {
-      const occupiedIds = await dataProvider.getActiveEmployeeIds();
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .in('role', ['employee', 'program_controller'])
-        .eq('status', 'approved');
-      if (occupiedIds.length > 0) {
-        query = query.not('id', 'in', `(${occupiedIds.join(',')})`);
-      }
-      const { data } = await query;
-      return (data || []).map(mapProfileRow);
+      const { data, error } = await getSupabaseClient().rpc(
+        "get_available_employees",
+      );
+      if (error) throw new Error(error.message);
+      return (data || []).map(
+        (row: {
+          id: string;
+          full_name: string;
+          role: UserRole;
+          employee_code: string | null;
+          created_at: string;
+        }) => ({
+          id: row.id,
+          email: "",
+          fullName: row.full_name,
+          role: row.role,
+          status: "approved" as UserStatus,
+          employeeCode: row.employee_code || undefined,
+          createdAt: row.created_at,
+        }),
+      );
     }
-    return mockStore.getAvailableEmployees();
+    return backendFailure(() => mockStore.getAvailableEmployees());
   },
 
-  getEmployeeProgramHistory: async (userId: string): Promise<ProgramMemberHistory[]> => {
+  getEmployeeProgramHistory: async (
+    userId: string,
+  ): Promise<ProgramMemberHistory[]> => {
     const allProgs = await dataProvider.getPrograms();
     return allProgs
-      .filter(p => p.controllerId === userId || p.teamMemberIds.includes(userId))
-      .map(p => ({
+      .filter(
+        (p) => p.controllerId === userId || p.teamMemberIds.includes(userId),
+      )
+      .map((p) => ({
         programId: p.id,
         programName: p.programName,
         hatcheryOrFarmName: p.hatcheryOrFarmName,
         startDate: p.scheduledStartDate,
         endDate: p.scheduledEndDate,
-        roleInProgram: (p.controllerId === userId ? 'program_controller' : 'team_member') as ProgramMemberRole,
+        roleInProgram: (p.controllerId === userId
+          ? "program_controller"
+          : "team_member") as ProgramMemberRole,
         status: p.status,
         auditorRemarks: p.auditorRemarks,
         auditScore: p.auditScore,

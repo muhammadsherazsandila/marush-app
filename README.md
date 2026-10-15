@@ -6,11 +6,10 @@ Marush (Pvt.) Ltd. is the **exclusive sole distributor of Ceva Animal Health in 
 
 ## 🚀 Key Features
 
-- **🔐 RBAC Authentication & Admin Verification Pipeline:**
+- **Authentication & Admin Verification Pipeline:**
   - Roles: `Admin`, `Program Controller`, `Employee` (default), `Program Auditor`.
-  - Self-service registration defaults to `pending` status. Users are routed to a verified holding state until approved by the Administrator.
-  - Email/Password and Google OAuth 2.0 supported via `dataProvider`.
-  - Interactive Demo quick-login switchers for instant evaluation across all roles.
+  - Google OAuth is the only sign-in method. New Google accounts are created with employee access and remain pending until an Administrator approves them, except for the single verified bootstrap administrator configured by migration 007.
+  - Applicants can request employee, controller, or auditor designation during sign-in; administrator access is provisioned by database policy and cannot be requested by a new account.
 
 - **📊 Administrator Command Center:**
   - **Overview Tab:** Summary metrics for total programs done, currently active programs, pending approval queues, and staff counts.
@@ -39,11 +38,13 @@ Marush (Pvt.) Ltd. is the **exclusive sole distributor of Ceva Animal Health in 
 
 ## 🛠️ Tech Stack & Workflow
 - **Framework:** Expo (React Native & Web) with TypeScript
-- **Styling:** Tailwind CSS / Native tokens matching official Marush brand colors (`#004F42`, `#16BAAF`, `#18333b`, `#fe5b2c`)
-- **Backend:** Supabase PostgreSQL with strict RLS policies, migrations, and full offline/demo fallback mode
+- **Styling:** NativeWind utility classes (Tailwind CSS 3) with MARUSH green and teal tokens across all application screens
+- **Backend:** Supabase PostgreSQL with row-level security and forward-only migrations
 - **Package Manager:** `pnpm`
 - **Agentic Tracking:** Superplan CLI
-- **CI/CD & Releases:** GitHub Actions (`.github/workflows/ci.yml` & `.github/workflows/release.yml`)
+- **CI/CD & Releases:** GitHub Actions install from the frozen pnpm lockfile, typecheck, and export the web app; tagged releases publish a checksum-verified web archive
+
+For new or updated UI, use NativeWind `className` utilities and the `marush-*` colors defined in `tailwind.config.js`. Use Lucide React Native components for interface icons.
 
 ---
 
@@ -51,8 +52,15 @@ Marush (Pvt.) Ltd. is the **exclusive sole distributor of Ceva Animal Health in 
 
 ### Install Dependencies
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
+
+### Configure the app
+Copy `.env.example` to `.env`, then set the Supabase project URL, public anon key, and Google web client ID. These `EXPO_PUBLIC_*` values are embedded in the client bundle and must never contain database passwords or Supabase service-role keys.
+
+`DATABASE_URL` is a private migration-runner credential. Keep it only in a local ignored `.env` file or a secured CI secret, and never prefix it with `EXPO_PUBLIC_`.
+
+Production tagged releases require the GitHub Actions secrets `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Configure the same OAuth redirect URLs in Google Cloud and Supabase Auth for the deployed web domain.
 
 ### Run Locally
 ```bash
@@ -77,18 +85,39 @@ pnpm run build:web
 Manage Supabase PostgreSQL migrations using the built-in migration runner:
 
 ```bash
-# Check current migration status against Supabase database
+# Check migration status against the configured database
 pnpm migrate:status
 
-# Create a new numbered migration file (e.g., supabase/migrations/004_add_flock_types.sql)
+# Create a new numbered migration file (e.g., supabase/migrations/007_add_flock_types.sql)
 pnpm migrate:new <migration_name>
 
 # Apply all pending migrations to the database
 pnpm migrate:up
 
-# CI check: Verify no migrations are pending (exits with code 1 if unapplied)
+# Check for pending migrations (connects to the configured database)
 pnpm migrate:check
 ```
+
+Run migration checks against staging before production. `migrate:up`, `migrate:status`, and `migrate:check` connect to the database and may create the migration tracking table or baseline existing files; do not point them at production until the change has been reviewed and approved. Apply migrations `006_add_requested_designation.sql` and `007_bootstrap_initial_google_admin.sql` before deploying this Google sign-in flow. Migration 007 removes the replaced administrator account and legacy demo seed function; it stops safely if that profile is still referenced by program or audit records, which must be reassigned first.
+
+Migration `005_production_security_hardening.sql` limits profile reads to the account owner, administrators, and colleagues assigned to a shared program. Only administrators can create profiles or change roles and approval status; self-registration is linked by the Supabase Auth trigger and starts as a pending employee except for the verified bootstrap identity. Other new users cannot request administrator access. Program controllers retrieve the limited staff roster through a role-checked RPC. Migration 005 also replaces the duplicate password hash used by migration 002 for its seeded accounts. Remove remaining sample profiles before go-live and verify the migration on staging first.
+
+Before production rollout, verify in staging that an employee cannot change their role or approval status, cannot read unrelated employee profiles, and can read colleagues on an assigned program; verify that a program controller can load the available employee roster and that an administrator can approve accounts and assign roles. The migration runner now validates PostgreSQL TLS certificates; database connection URLs must use valid URL encoding for reserved characters in credentials.
+
+### Build an Android APK with GitHub Actions
+The manual **Build Android APK** workflow uses GitHub's Ubuntu runner, Expo Prebuild, and Gradle to build an installable APK directly on GitHub. It does not use Expo Application Services (EAS) and can also run automatically for tags matching `android-v*`.
+
+Before running it, create or link the Expo project and add these GitHub repository secrets:
+
+- `EXPO_PUBLIC_SUPABASE_URL`: Supabase project URL
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`: Supabase public anon key
+
+Run it from **GitHub → Actions → Build Android APK → Run workflow**. Download the generated APK from the workflow's **Artifacts** section.
+
+The APK uses the `marushapp://auth/callback` deep link. Add that URL to Supabase Auth's allowed redirect URLs before testing Google sign-in. Expo Go's `exp://...` callback is only for local development.
+
+### Release targets
+GitHub tagged releases contain a production **web export**. The Android APK is built by the separate manual/tagged workflow and requires only the repository secrets listed above. The generated APK is unsigned for internal testing; production distribution requires configuring Android signing credentials in the workflow.
 
 ---
 

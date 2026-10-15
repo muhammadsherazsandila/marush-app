@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Toast from 'react-native-toast-message';
+import { Activity, Bird, CircleCheck, ClipboardList, RefreshCw, Syringe, Thermometer } from 'lucide-react-native';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program } from '../types';
-import { dataProvider, mockStore } from '../services/supabase';
+import { dataProvider } from '../services';
+import { IconLabel } from '../components/IconLabel';
 
 interface EmployeeDashboardProps {
   currentUser: UserProfile;
+  activeArea: 'overview' | 'programs';
 }
 
-export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser }) => {
-  const [allPrograms, setAllPrograms] = useState<Program[]>(mockStore.getPrograms());
+export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser, activeArea }) => {
+  const [allPrograms, setAllPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(false);
 
   const refreshData = useCallback(async () => {
@@ -24,8 +27,12 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
     try {
       const progs = await dataProvider.getPrograms();
       setAllPrograms(progs);
-    } catch {
-      setAllPrograms(mockStore.getPrograms());
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Unable to load program data',
+        text2: error?.message || 'Check your connection and try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -44,128 +51,122 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
   const activeCount = attendedPrograms.filter(p => p.status === 'active').length;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.content}>
-        {/* Profile Summary Card with Refresh */}
-        <View style={styles.profileCard}>
+    <ScrollView className="flex-1 bg-marush-background">
+      <View className="flex-grow p-4 md:p-8">
+      <View className="mx-auto w-full max-w-[1200px] gap-3">
+        {activeArea === 'overview' && <View className="flex-row flex-wrap items-center justify-between gap-3.5 rounded-lg border border-marush-border bg-white p-[22px]">
           <View>
-            <Text style={styles.welcomeText}>Field Personnel Portal</Text>
-            <Text style={styles.employeeName}>{currentUser.fullName}</Text>
-            <Text style={styles.employeeCode}>{currentUser.employeeCode || 'MRSH-EMP'}</Text>
+            <Text className="text-[11px] font-bold uppercase text-marush-muted-light">Overview</Text>
+            <Text className="mt-0.5 text-[22px] font-extrabold text-marush-primary">{currentUser.fullName}</Text>
+            <Text className="mt-0.5 text-xs font-semibold text-marush-muted">{currentUser.employeeCode || 'MRSH-EMP'}</Text>
           </View>
-          <View style={styles.rightHeaderGroup}>
-            <View style={styles.roleTag}>
-              <Text style={styles.roleTagText}>{currentUser.role.replace('_', ' ').toUpperCase()}</Text>
+          <View className="items-end gap-2">
+            <View className="rounded-lg bg-marush-subtle px-2.5 py-1.5">
+              <Text className="text-[10px] font-extrabold text-marush-primary">{currentUser.role.replace('_', ' ').toUpperCase()}</Text>
             </View>
-            <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+            <TouchableOpacity className="rounded-md border border-marush-border bg-white px-2.5 py-1.5" onPress={refreshData} disabled={loading}>
               {loading ? (
                 <ActivityIndicator size="small" color={Colors.primary} />
               ) : (
-                <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+                <IconLabel icon={RefreshCw} label="Refresh" className="text-[11px] font-semibold text-marush-primary" />
               )}
             </TouchableOpacity>
           </View>
-        </View>
+        </View>}
 
         {/* Overview Tab Stats */}
-        <Text style={styles.sectionHeading}>Overview & Attendance Stats</Text>
-        <View style={styles.statsRow}>
-          <View style={[styles.statBox, { borderLeftColor: Colors.primary }]}>
-            <Text style={styles.statLabel}>Total Attended Programs</Text>
-            <Text style={[styles.statValue, { color: Colors.primary }]}>
+        {activeArea === 'overview' && <>
+        <IconLabel icon={ClipboardList} label="Program summary" size={18} className="text-xl font-bold text-marush-text" />
+        <View className="flex-row flex-wrap gap-2.5">
+          <View className="min-w-[130px] flex-1 rounded-[10px] border border-l-4 border-marush-border border-l-marush-primary bg-white p-3.5">
+            <IconLabel icon={ClipboardList} label="Total programs" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
+            <Text className="mt-1 text-2xl font-extrabold text-marush-primary">
               {attendedPrograms.length}
             </Text>
           </View>
 
-          <View style={[styles.statBox, { borderLeftColor: Colors.secondary }]}>
-            <Text style={styles.statLabel}>Currently Active</Text>
-            <Text style={[styles.statValue, { color: Colors.secondary }]}>
+          <View className="min-w-[130px] flex-1 rounded-[10px] border border-l-4 border-marush-border border-l-marush-secondary bg-white p-3.5">
+            <IconLabel icon={Activity} label="Active" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
+            <Text className="mt-1 text-2xl font-extrabold text-marush-secondary">
               {activeCount}
             </Text>
           </View>
 
-          <View style={[styles.statBox, { borderLeftColor: Colors.success }]}>
-            <Text style={styles.statLabel}>Successfully Completed</Text>
-            <Text style={[styles.statValue, { color: Colors.success }]}>
+          <View className="min-w-[130px] flex-1 rounded-[10px] border border-l-4 border-marush-border border-l-marush-primary-light bg-white p-3.5">
+            <IconLabel icon={CircleCheck} label="Completed" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
+            <Text className="mt-1 text-2xl font-extrabold text-marush-primary-light">
               {completedCount}
             </Text>
           </View>
         </View>
+        </>}
 
         {/* Attended Programs List with Role in that Program */}
-        <Text style={[styles.sectionHeading, { marginTop: 24 }]}>
-          My Attended Field Programs
-        </Text>
+        {activeArea === 'programs' && <>
+        <IconLabel icon={ClipboardList} label="My programs" size={18} className="mt-2 text-xl font-bold text-marush-text" />
 
         {attendedPrograms.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>
-              You have not been assigned to any programs yet. When a Program Controller selects
-              you for a team, it will appear here in real time.
+          <View className="items-center rounded-[10px] border border-marush-border bg-white p-6">
+            <Text className="text-center text-[13px] leading-[18px] text-marush-muted-light">
+              No programs assigned.
             </Text>
           </View>
         ) : (
           attendedPrograms.map(prog => {
             const isController = prog.controllerId === currentUser.id;
             return (
-              <View key={prog.id} style={styles.programCard}>
-                <View style={styles.progHeaderRow}>
-                  <Text style={styles.progTitle}>{prog.programName}</Text>
+              <View key={prog.id} className="mb-2 gap-1 rounded-xl border border-marush-border bg-white p-4">
+                <View className="flex-row items-center justify-between gap-2">
+                  <Text className="flex-1 text-[15px] font-bold text-marush-text">{prog.programName}</Text>
                   <View
-                    style={[
-                      styles.roleInProgBadge,
-                      isController ? styles.controllerBadge : styles.memberBadge,
-                    ]}
+                    className={`rounded-md px-2 py-1 ${isController ? 'bg-marush-subtle' : 'bg-marush-primary-subtle'}`}
                   >
                     <Text
-                      style={[
-                        styles.roleInProgText,
-                        isController ? styles.controllerText : styles.memberText,
-                      ]}
+                      className={`text-[9px] font-extrabold ${isController ? 'text-marush-muted' : 'text-marush-primary'}`}
                     >
                       {isController ? 'PROGRAM CONTROLLER' : 'TEAM MEMBER'}
                     </Text>
                   </View>
                 </View>
 
-                <Text style={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                <Text className="text-[13px] font-medium text-marush-muted">{prog.hatcheryOrFarmName}</Text>
 
-                <View style={styles.detailsRow}>
-                  <Text style={styles.metaItem}>
+                <View className="mt-1 flex-row flex-wrap gap-x-4 gap-y-1">
+                  <Text className="text-xs text-marush-muted">
                     Flock: {prog.flockSize.toLocaleString()} birds
                   </Text>
-                  <Text style={styles.metaItem}>
-                    Status: <Text style={styles.statusBold}>{prog.status.toUpperCase()}</Text>
+                  <Text className="text-xs text-marush-muted">
+                    Status: <Text className="font-bold text-marush-primary">{prog.status.toUpperCase()}</Text>
                   </Text>
                 </View>
 
-                <Text style={styles.dateMeta}>
+                <Text className="mt-0.5 text-[11px] text-marush-muted-light">
                   Scheduled: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
                 </Text>
 
                 {prog.completionMetrics && (
-                  <View style={styles.metricsBox}>
-                    <Text style={styles.metricsTitle}>Vaccination & Cold-Chain Records:</Text>
-                    <Text style={styles.metricsText}>
-                      • Birds Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()}
+                  <View className="mt-2 gap-0.5 rounded-lg bg-marush-subtle p-2.5">
+                    <Text className="text-[11px] font-bold text-marush-primary">Vaccination & Cold-Chain Records:</Text>
+                    <Text className="text-[11px] text-marush-muted">
+                      Birds Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()}
                     </Text>
-                    <Text style={styles.metricsText}>
-                      • Vaccine: {prog.completionMetrics.vaccineType} (Batch: {prog.completionMetrics.batchNumber})
+                    <Text className="text-[11px] text-marush-muted">
+                      Vaccine: {prog.completionMetrics.vaccineType} (Batch: {prog.completionMetrics.batchNumber})
                     </Text>
-                    <Text style={styles.metricsText}>
-                      • Cold Chain Log: {prog.completionMetrics.coldChainTempCelsius}°C
+                    <Text className="text-[11px] text-marush-muted">
+                      Cold Chain Log: {prog.completionMetrics.coldChainTempCelsius}°C
                     </Text>
                   </View>
                 )}
 
                 {prog.auditorRemarks ? (
-                  <View style={styles.remarksBox}>
-                    <Text style={styles.remarksTitle}>
+                  <View className="mt-2 gap-0.5 rounded-lg border border-marush-border bg-marush-subtle p-2.5">
+                    <Text className="text-[11px] font-bold text-marush-primary">
                       Auditor Remarks ({prog.auditorName}):
                     </Text>
-                    <Text style={styles.remarksText}>"{prog.auditorRemarks}"</Text>
+                    <Text className="text-xs italic text-marush-primary-dark">"{prog.auditorRemarks}"</Text>
                     {prog.auditScore ? (
-                      <Text style={styles.scorePill}>Score: {prog.auditScore}/100</Text>
+                      <Text className="mt-0.5 text-[11px] font-extrabold text-marush-primary">Score: {prog.auditScore}/100</Text>
                     ) : null}
                   </View>
                 ) : null}
@@ -173,231 +174,10 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
             );
           })
         )}
+        </>}
+      </View>
       </View>
     </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: Colors.background,
-    padding: 16,
-  },
-  content: {
-    maxWidth: 720,
-    width: '100%',
-    alignSelf: 'center',
-    gap: 12,
-  },
-  profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  welcomeText: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  employeeName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.primary,
-    marginTop: 2,
-  },
-  employeeCode: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  rightHeaderGroup: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  roleTag: {
-    backgroundColor: '#E0F2FE',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  roleTagText: {
-    color: '#0369A1',
-    fontWeight: '800',
-    fontSize: 10,
-  },
-  refreshBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#FFFFFF',
-  },
-  refreshBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  sectionHeading: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  statBox: {
-    flex: 1,
-    minWidth: 130,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderLeftWidth: 4,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  programCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 8,
-    gap: 4,
-  },
-  progHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  roleInProgBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  roleInProgText: {
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  controllerBadge: {
-    backgroundColor: '#FEF3C7',
-  },
-  controllerText: {
-    color: '#B45309',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  memberBadge: {
-    backgroundColor: '#DCFCE7',
-  },
-  memberText: {
-    color: '#15803D',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  progLocation: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 4,
-  },
-  metaItem: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  statusBold: {
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  dateMeta: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  metricsBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-    gap: 2,
-  },
-  metricsTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  metricsText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  remarksBox: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    gap: 2,
-  },
-  remarksTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#15803D',
-  },
-  remarksText: {
-    fontSize: 12,
-    color: '#166534',
-    fontStyle: 'italic',
-  },
-  scorePill: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#15803D',
-    marginTop: 2,
-  },
-});

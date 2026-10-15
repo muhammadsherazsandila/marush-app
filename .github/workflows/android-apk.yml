@@ -1,0 +1,73 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'android-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build Android APK on GitHub
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate required secrets
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$EXPO_PUBLIC_SUPABASE_URL" || { echo "Missing EXPO_PUBLIC_SUPABASE_URL"; exit 1; }
+          test -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" || { echo "Missing EXPO_PUBLIC_SUPABASE_ANON_KEY"; exit 1; }
+
+      - name: Generate native Android project
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_AUTH_REDIRECT_URL: marushapp://auth/callback
+        run: pnpm exec expo prebuild --platform android --non-interactive
+
+      - name: Build unsigned release APK with Gradle
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_AUTH_REDIRECT_URL: marushapp://auth/callback
+        run: |
+          chmod +x android/gradlew
+          android/gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "marush-${GITHUB_REF_NAME}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marush-android-apk-${{ github.run_number }}
+          path: marush-*.apk
+          retention-days: 14

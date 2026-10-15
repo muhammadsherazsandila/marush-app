@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -10,22 +9,24 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { Check, CircleX, ClipboardCheck, Plus, RefreshCw, Send } from 'lucide-react-native';
 import { Colors } from '../constants/colors';
-import { UserProfile, Program, ProgramCompletionMetrics } from '../types';
-import { dataProvider, mockStore } from '../services/supabase';
+import { UserProfile, Program, ProgramCompletionMetrics, ProgramStatus } from '../types';
+import { dataProvider } from '../services';
 
 interface ProgramControllerDashboardProps {
   currentUser: UserProfile;
+  activeArea: 'overview' | 'programs';
 }
 
 export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProps> = ({
   currentUser,
+  activeArea,
 }) => {
   const [activeTab, setActiveTab] = useState<'my_programs' | 'initiate'>('my_programs');
-  const [programs, setPrograms] = useState<Program[]>(mockStore.getPrograms());
-  const [availableEmployees, setAvailableEmployees] = useState<UserProfile[]>(
-    mockStore.getAvailableEmployees()
-  );
+  const [programFilter, setProgramFilter] = useState<ProgramStatus | 'all'>('all');
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [availableEmployees, setAvailableEmployees] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -58,9 +59,12 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
       ]);
       setPrograms(allProgs);
       setAvailableEmployees(available);
-    } catch {
-      setPrograms(mockStore.getPrograms());
-      setAvailableEmployees(mockStore.getAvailableEmployees());
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Unable to load program data',
+        text2: error?.message || 'Check your connection and try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -70,7 +74,12 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
     refreshData();
   }, [refreshData]);
 
+  useEffect(() => {
+    if (activeArea === 'overview') setActiveTab('my_programs');
+  }, [activeArea]);
+
   const myPrograms = programs.filter(p => p.controllerId === currentUser.id);
+  const visiblePrograms = myPrograms.filter(p => programFilter === 'all' || p.status === programFilter);
 
   const toggleSelectEmployee = (id: string) => {
     if (selectedEmpIds.includes(id)) {
@@ -195,126 +204,132 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   };
 
   return (
-    <View style={styles.container}>
+    <View className={styles.container}>
       {/* Tab Switcher & Refresh */}
-      <View style={styles.tabBar}>
-        <View style={styles.tabGroup}>
+      {activeArea === 'programs' && <View className={styles.tabBar}>
+        <View className={styles.tabGroup}>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'my_programs' && styles.tabBtnActive]}
+            className={`${styles.tabBtn} ${activeTab === 'my_programs' ? styles.tabBtnActive : ''}`}
             onPress={() => setActiveTab('my_programs')}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'my_programs' && styles.tabBtnTextActive]}>
+            <Text className={`${styles.tabBtnText} ${activeTab === 'my_programs' ? styles.tabBtnTextActive : ''}`}>
               My Programs ({myPrograms.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'initiate' && styles.tabBtnActive]}
+            className={`${styles.tabBtn} ${activeTab === 'initiate' ? styles.tabBtnActive : ''}`}
             onPress={() => {
               refreshData();
               setActiveTab('initiate');
             }}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'initiate' && styles.tabBtnTextActive]}>
-              + Initiate Program
-            </Text>
+            <View className="flex-row items-center gap-1">
+              <Plus size={14} color={activeTab === 'initiate' ? Colors.primary : Colors.textSecondary} />
+              <Text className={`${styles.tabBtnText} ${activeTab === 'initiate' ? styles.tabBtnTextActive : ''}`}>Initiate Program</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+        <TouchableOpacity className={styles.refreshBtn} onPress={refreshData} disabled={loading}>
           {loading ? (
             <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
-            <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+            <View className="flex-row items-center gap-1.5">
+              <RefreshCw size={15} color={Colors.primary} />
+              <Text className={styles.refreshBtnText}>Refresh</Text>
+            </View>
           )}
         </TouchableOpacity>
-      </View>
+      </View>}
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {activeArea === 'programs' && activeTab === 'my_programs' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName={styles.filterRow}>
+        {([
+          ['all', 'All'],
+          ['active', 'Active'],
+          ['pending_approval', 'Awaiting approval'],
+          ['pending_audit', 'Pending audit'],
+          ['completed', 'Completed'],
+        ] as const).map(([filter, label]) => (
+          <TouchableOpacity key={filter} className={`${styles.filterChip} ${programFilter === filter ? styles.filterChipActive : ''}`} onPress={() => setProgramFilter(filter)}>
+            <Text className={`${styles.filterChipText} ${programFilter === filter ? styles.filterChipTextActive : ''}`}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>}
+
+      <ScrollView contentContainerClassName={styles.content}>
         {activeTab === 'my_programs' ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Field Operations Assigned to You</Text>
-            {myPrograms.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>You have not initiated any programs yet.</Text>
+          <View className={styles.section}>
+            <Text className={styles.sectionTitle}>{activeArea === 'overview' ? 'Your operations at a glance' : 'Your programs'}</Text>
+            {visiblePrograms.length === 0 ? (
+              <View className={styles.emptyBox}>
+                <Text className={styles.emptyText}>{myPrograms.length === 0 ? 'You have not initiated any programs yet.' : 'No programs match this status filter.'}</Text>
                 <TouchableOpacity
-                  style={styles.initiatePromptBtn}
+                  className={styles.initiatePromptBtn}
                   onPress={() => setActiveTab('initiate')}
                 >
-                  <Text style={styles.initiatePromptBtnText}>Initiate First Program</Text>
+                  <Text className={styles.initiatePromptBtnText}>Initiate First Program</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              myPrograms.map(prog => (
-                <View key={prog.id} style={styles.progCard}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>{prog.programName}</Text>
+              visiblePrograms.map(prog => (
+                <View key={prog.id} className={styles.progCard}>
+                  <View className={styles.cardHeader}>
+                    <Text className={styles.cardTitle}>{prog.programName}</Text>
                     <View
-                      style={[
-                        styles.statusBadge,
-                        prog.status === 'active' && { backgroundColor: '#DCFCE7' },
-                        prog.status === 'pending_approval' && { backgroundColor: '#FEF3C7' },
-                        prog.status === 'pending_audit' && { backgroundColor: '#EDE9FE' },
-                        prog.status === 'completed' && { backgroundColor: '#E0F2FE' },
-                      ]}
+                      className={`${styles.statusBadge} bg-marush-subtle`}
                     >
                       <Text
-                        style={[
-                          styles.statusBadgeText,
-                          prog.status === 'active' && { color: '#15803D' },
-                          prog.status === 'pending_approval' && { color: '#B45309' },
-                          prog.status === 'pending_audit' && { color: '#6D28D9' },
-                          prog.status === 'completed' && { color: '#0369A1' },
-                        ]}
+                        className={`${styles.statusBadgeText} ${prog.status === 'pending_approval' ? 'text-marush-muted' : 'text-marush-primary'}`}
                       >
                         {prog.status.replace('_', ' ').toUpperCase()}
                       </Text>
                     </View>
                   </View>
 
-                  <Text style={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                  <Text style={styles.cardMeta}>
-                    Flock: {prog.flockSize.toLocaleString()} birds • Team: {prog.teamMemberIds.length} members
+                  <Text className={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
+                  <Text className={styles.cardMeta}>
+                    Flock: {prog.flockSize.toLocaleString()} birds Ã¢â‚¬Â¢ Team: {prog.teamMemberIds.length} members
                   </Text>
-                  <Text style={styles.cardMeta}>
+                  <Text className={styles.cardMeta}>
                     Schedule: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
                   </Text>
                   {prog.auditorName ? (
-                    <Text style={styles.cardMeta}>Assigned Auditor: {prog.auditorName}</Text>
+                    <Text className={styles.cardMeta}>Assigned Auditor: {prog.auditorName}</Text>
                   ) : null}
 
                   {prog.status === 'active' && (
                     <TouchableOpacity
-                      style={styles.endProgBtn}
+                      className={styles.endProgBtn}
                       onPress={() => handleOpenEndProgram(prog)}
                     >
-                      <Text style={styles.endProgBtnText}>End Program & Send to Auditor</Text>
+                      <Text className={styles.endProgBtnText}>End Program & Send to Auditor</Text>
                     </TouchableOpacity>
                   )}
 
                   {prog.status === 'pending_approval' && (
-                    <View style={styles.waitingBanner}>
-                      <Text style={styles.waitingBannerText}>
+                    <View className={styles.waitingBanner}>
+                      <Text className={styles.waitingBannerText}>
                         Team submitted. Waiting for Admin to approve & assign Auditor.
                       </Text>
                     </View>
                   )}
 
                   {prog.status === 'pending_audit' && (
-                    <View style={styles.waitingBanner}>
-                      <Text style={styles.waitingBannerText}>
+                    <View className={styles.waitingBanner}>
+                      <Text className={styles.waitingBannerText}>
                         Program completed. Awaiting Auditor's review and remarks.
                       </Text>
                     </View>
                   )}
 
                   {prog.status === 'completed' && prog.auditorRemarks ? (
-                    <View style={styles.auditFeedback}>
-                      <Text style={styles.auditFeedbackTitle}>
+                    <View className={styles.auditFeedback}>
+                      <Text className={styles.auditFeedbackTitle}>
                         Auditor Sign-off ({prog.auditorName}):
                       </Text>
-                      <Text style={styles.auditFeedbackText}>"{prog.auditorRemarks}"</Text>
+                      <Text className={styles.auditFeedbackText}>"{prog.auditorRemarks}"</Text>
                       {prog.auditScore ? (
-                        <Text style={styles.auditScorePill}>Audit Score: {prog.auditScore}/100</Text>
+                        <Text className={styles.auditScorePill}>Audit Score: {prog.auditScore}/100</Text>
                       ) : null}
                     </View>
                   ) : null}
@@ -323,16 +338,16 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
             )}
           </View>
         ) : (
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Initiate Field Program & Draft Team</Text>
-            <Text style={styles.formSub}>
+          <View className={styles.formCard}>
+            <Text className={styles.formTitle}>Initiate Field Program & Draft Team</Text>
+            <Text className={styles.formSub}>
               Select available personnel who are not engaged in any other active concurrent programs.
             </Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Program Title</Text>
+            <View className={styles.inputGroup}>
+              <Text className={styles.label}>Program Title</Text>
               <TextInput
-                style={styles.input}
+                className={styles.input}
                 placeholder="e.g. Hatchery Ceva ND In-Ovo Vaccination"
                 placeholderTextColor={Colors.textMuted}
                 value={programName}
@@ -340,10 +355,10 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Hatchery / Farm Location</Text>
+            <View className={styles.inputGroup}>
+              <Text className={styles.label}>Hatchery / Farm Location</Text>
               <TextInput
-                style={styles.input}
+                className={styles.input}
                 placeholder="e.g. Big Bird Hatcheries - Unit 4, Raiwind"
                 placeholderTextColor={Colors.textMuted}
                 value={hatcheryOrFarm}
@@ -351,10 +366,10 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Flock Size (Birds)</Text>
+            <View className={styles.inputGroup}>
+              <Text className={styles.label}>Flock Size (Birds)</Text>
               <TextInput
-                style={styles.input}
+                className={styles.input}
                 placeholder="e.g. 50000"
                 placeholderTextColor={Colors.textMuted}
                 value={flockSize}
@@ -363,38 +378,38 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
               />
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Start Date</Text>
+            <View className={styles.row}>
+              <View className={`${styles.inputGroup} flex-1`}>
+                <Text className={styles.label}>Start Date</Text>
                 <TextInput
-                  style={styles.input}
+                  className={styles.input}
                   value={startDate}
                   onChangeText={setStartDate}
                 />
               </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Start Time</Text>
+              <View className={`${styles.inputGroup} flex-1`}>
+                <Text className={styles.label}>Start Time</Text>
                 <TextInput
-                  style={styles.input}
+                  className={styles.input}
                   value={startTime}
                   onChangeText={setStartTime}
                 />
               </View>
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>End Date</Text>
+            <View className={styles.row}>
+              <View className={`${styles.inputGroup} flex-1`}>
+                <Text className={styles.label}>End Date</Text>
                 <TextInput
-                  style={styles.input}
+                  className={styles.input}
                   value={endDate}
                   onChangeText={setEndDate}
                 />
               </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>End Time</Text>
+              <View className={`${styles.inputGroup} flex-1`}>
+                <Text className={styles.label}>End Time</Text>
                 <TextInput
-                  style={styles.input}
+                  className={styles.input}
                   value={endTime}
                   onChangeText={setEndTime}
                 />
@@ -402,39 +417,38 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
             </View>
 
             {/* Dynamic Available Employees Selector */}
-            <View style={styles.inputGroup}>
-              <View style={styles.empSelectHeader}>
-                <Text style={styles.label}>Select Available Team Members</Text>
-                <Text style={styles.availCount}>
+            <View className={styles.inputGroup}>
+              <View className={styles.empSelectHeader}>
+                <Text className={styles.label}>Select Available Team Members</Text>
+                <Text className={styles.availCount}>
                   {availableEmployees.length} Available Staff
                 </Text>
               </View>
 
               {availableEmployees.length === 0 ? (
-                <View style={styles.noEmpBox}>
-                  <Text style={styles.noEmpWarning}>
+                <View className={styles.noEmpBox}>
+                  <Text className={styles.noEmpWarning}>
                     All employees are currently occupied in active programs!
                   </Text>
                 </View>
               ) : (
-                <View style={styles.empListGrid}>
+                <View className={styles.empListGrid}>
                   {availableEmployees.map(emp => {
                     const isSelected = selectedEmpIds.includes(emp.id);
                     return (
                       <TouchableOpacity
                         key={emp.id}
-                        style={[styles.empPill, isSelected && styles.empPillSelected]}
+                        className={`${styles.empPill} ${isSelected ? styles.empPillSelected : ''}`}
                         onPress={() => toggleSelectEmployee(emp.id)}
                       >
-                        <Text
-                          style={[
-                            styles.empPillText,
-                            isSelected && styles.empPillTextSelected,
-                          ]}
-                        >
-                          {isSelected ? '✓ ' : '+ '}
-                          {emp.fullName} ({emp.employeeCode || emp.role})
-                        </Text>
+                        <View className="flex-row items-center gap-1.5">
+                          {isSelected ? <Check size={14} color={Colors.primary} /> : <Plus size={14} color={Colors.textSecondary} />}
+                          <Text
+                            className={`${styles.empPillText} ${isSelected ? styles.empPillTextSelected : ''}`}
+                          >
+                            {emp.fullName} ({emp.employeeCode || emp.role})
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
@@ -443,14 +457,17 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
             </View>
 
             <TouchableOpacity
-              style={[styles.submitProgBtn, submitting && styles.btnDisabled]}
+              className={`${styles.submitProgBtn} ${submitting ? styles.btnDisabled : ''}`}
               onPress={handleInitiateProgram}
               disabled={submitting}
             >
               {submitting ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.submitProgBtnText}>Submit Team to Admin for Approval</Text>
+                <View className="flex-row items-center justify-center gap-2">
+                  <ClipboardCheck size={15} color={Colors.white} />
+                  <Text className={styles.submitProgBtnText}>Submit Team to Admin for Approval</Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -460,78 +477,80 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
       {/* End Program / Send to Auditor Modal */}
       {endingProgram && (
         <Modal visible transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>End Program & Record Metrics</Text>
-              <Text style={styles.modalSub}>{endingProgram.programName}</Text>
+          <View className={styles.modalOverlay}>
+            <View className={styles.modalCard}>
+              <Text className={styles.modalTitle}>End Program & Record Metrics</Text>
+              <Text className={styles.modalSub}>{endingProgram.programName}</Text>
 
-              <ScrollView style={styles.modalScroll}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Total Birds Vaccinated</Text>
+              <ScrollView className={styles.modalScroll}>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Total Birds Vaccinated</Text>
                   <TextInput
-                    style={styles.input}
+                    className={styles.input}
                     value={birdsVaccinated}
                     onChangeText={setBirdsVaccinated}
                     keyboardType="numeric"
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Dosage Per Bird</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Dosage Per Bird</Text>
                   <TextInput
-                    style={styles.input}
+                    className={styles.input}
                     value={dosagePerBird}
                     onChangeText={setDosagePerBird}
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Vaccine Batch Number</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Vaccine Batch Number</Text>
                   <TextInput
-                    style={styles.input}
+                    className={styles.input}
                     value={batchNumber}
                     onChangeText={setBatchNumber}
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Vaccine Type</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Vaccine Type</Text>
                   <TextInput
-                    style={styles.input}
+                    className={styles.input}
                     value={vaccineType}
                     onChangeText={setVaccineType}
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Cold-Chain Log Temperature (°C)</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Cold-Chain Log Temperature (Ã‚Â°C)</Text>
                   <TextInput
-                    style={styles.input}
+                    className={styles.input}
                     value={coldChainTemp}
                     onChangeText={setColdChainTemp}
                     keyboardType="numeric"
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Equipment Check Status</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Equipment Check Status</Text>
                   <TouchableOpacity
-                    style={[
-                      styles.toggleBtn,
-                      equipmentCheckPassed ? styles.toggleBtnPassed : styles.toggleBtnFailed,
-                    ]}
+                    className={`${styles.toggleBtn} ${equipmentCheckPassed ? styles.toggleBtnPassed : styles.toggleBtnFailed}`}
                     onPress={() => setEquipmentCheckPassed(!equipmentCheckPassed)}
                   >
-                    <Text style={styles.toggleBtnText}>
-                      {equipmentCheckPassed ? '✓ Equipment Check PASSED' : '✕ Equipment Check FAILED'}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      {equipmentCheckPassed
+                        ? <Check size={15} color={Colors.white} strokeWidth={2.5} />
+                        : <CircleX size={15} color={Colors.white} strokeWidth={2.5} />}
+                      <Text className={styles.toggleBtnText}>
+                        Equipment Check {equipmentCheckPassed ? 'PASSED' : 'FAILED'}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Flock Monitoring Observations</Text>
+                <View className={styles.inputGroup}>
+                  <Text className={styles.label}>Flock Monitoring Observations</Text>
                   <TextInput
-                    style={[styles.input, { height: 60 }]}
+                    className={`${styles.input} h-[60px]`}
                     multiline
                     value={farmFlockNotes}
                     onChangeText={setFarmFlockNotes}
@@ -539,23 +558,26 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                 </View>
               </ScrollView>
 
-              <View style={styles.modalBtnRow}>
+              <View className={styles.modalBtnRow}>
                 <TouchableOpacity
-                  style={styles.cancelModalBtn}
+                  className={styles.cancelModalBtn}
                   onPress={() => setEndingProgram(null)}
                   disabled={submitting}
                 >
-                  <Text style={styles.cancelModalBtnText}>Cancel</Text>
+                  <Text className={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.confirmModalBtn, submitting && styles.btnDisabled]}
+                  className={`${styles.confirmModalBtn} ${submitting ? styles.btnDisabled : ''}`}
                   onPress={handleConfirmEndProgram}
                   disabled={submitting}
                 >
                   {submitting ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.confirmModalBtnText}>Send to Auditor</Text>
+                    <View className="flex-row items-center justify-center gap-2">
+                      <Send size={15} color={Colors.white} />
+                      <Text className={styles.confirmModalBtnText}>Send to Auditor</Text>
+                    </View>
                   )}
                 </TouchableOpacity>
               </View>
@@ -567,346 +589,74 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  tabGroup: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  tabBtnActive: {
-    backgroundColor: Colors.primary,
-  },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  tabBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  refreshBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#FFFFFF',
-  },
-  refreshBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  content: {
-    padding: 16,
-    maxWidth: 720,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  section: {
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  emptyBox: {
-    padding: 32,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  initiatePromptBtn: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  initiatePromptBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  progCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 10,
-    gap: 4,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  cardSub: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  cardMeta: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  endProgBtn: {
-    backgroundColor: Colors.accent,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  endProgBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  waitingBanner: {
-    backgroundColor: '#F8FAFC',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  waitingBannerText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  auditFeedback: {
-    backgroundColor: '#F0FDF4',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  auditFeedbackTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#15803D',
-  },
-  auditFeedbackText: {
-    fontSize: 12,
-    color: '#166534',
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  auditScorePill: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#15803D',
-    marginTop: 4,
-  },
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 14,
-  },
-  formTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  formSub: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-  },
-  inputGroup: {
-    gap: 4,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    backgroundColor: '#FAFAFA',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  empSelectHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  availCount: {
-    fontSize: 11,
-    color: Colors.secondaryDark,
-    fontWeight: '700',
-  },
-  noEmpBox: {
-    backgroundColor: '#FEF2F2',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    marginVertical: 4,
-  },
-  noEmpWarning: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontStyle: 'italic',
-  },
-  empListGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-  },
-  empPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#F8FAFC',
-  },
-  empPillSelected: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
-  },
-  empPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  empPillTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  submitProgBtn: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnDisabled: {
-    opacity: 0.7,
-  },
-  submitProgBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  modalSub: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 12,
-  },
-  modalScroll: {
-    marginBottom: 16,
-  },
-  toggleBtn: {
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  toggleBtnPassed: {
-    backgroundColor: '#DCFCE7',
-  },
-  toggleBtnFailed: {
-    backgroundColor: '#FEE2E2',
-  },
-  toggleBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  cancelModalBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  cancelModalBtnText: {
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  confirmModalBtn: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  confirmModalBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-});
+const styles = {
+  container: 'flex-1 bg-marush-background',
+  tabBar: 'flex-row flex-wrap items-center justify-between border-b border-marush-border bg-white px-4 md:px-7',
+  filterRow: 'gap-2 px-5 py-3',
+  filterChip: 'min-h-[34px] justify-center rounded-full border border-marush-border bg-white px-3',
+  filterChipActive: 'border-marush-secondary bg-marush-primary-subtle',
+  filterChipText: 'text-xs font-semibold text-marush-muted',
+  filterChipTextActive: 'font-bold text-marush-primary',
+  tabGroup: 'flex-row flex-wrap gap-[18px]',
+  tabBtn: 'border-b-2 border-transparent px-1 py-[15px]',
+  tabBtnActive: 'border-marush-primary',
+  tabBtnText: 'text-[13px] font-semibold text-marush-muted',
+  tabBtnTextActive: 'font-bold text-marush-primary',
+  refreshBtn: 'rounded-lg border border-marush-border bg-white px-3 py-2',
+  refreshBtnText: 'text-xs font-semibold text-marush-primary',
+  content: 'mx-auto w-full max-w-[1200px] p-4 md:p-8',
+  section: 'gap-3',
+  sectionTitle: 'mb-1 text-xl font-bold text-marush-text',
+  emptyBox: 'items-center gap-3 p-8',
+  emptyText: 'text-[13px] text-marush-muted-light',
+  initiatePromptBtn: 'rounded-lg bg-marush-primary px-4 py-2',
+  initiatePromptBtnText: 'text-[13px] font-bold text-white',
+  progCard: 'mb-2.5 gap-1 rounded-[10px] border border-marush-border bg-white p-4',
+  cardHeader: 'flex-row flex-wrap items-start justify-between gap-2',
+  cardTitle: 'min-w-0 flex-1 text-[15px] font-bold text-marush-text',
+  statusBadge: 'rounded-md px-2 py-1',
+  statusBadgeText: 'text-[10px] font-extrabold',
+  cardSub: 'text-[13px] text-marush-muted',
+  cardMeta: 'text-xs text-marush-muted-light',
+  endProgBtn: 'mt-2.5 items-center rounded-lg bg-marush-secondary-dark py-2',
+  endProgBtnText: 'text-[13px] font-bold text-white',
+  waitingBanner: 'mt-2 rounded-md bg-marush-subtle p-2',
+  waitingBannerText: 'text-[11px] italic text-marush-muted',
+  auditFeedback: 'mt-2 rounded-lg border border-marush-border bg-marush-subtle p-2.5',
+  auditFeedbackTitle: 'text-[11px] font-bold text-marush-primary',
+  auditFeedbackText: 'mt-0.5 text-xs italic text-marush-primary-dark',
+  auditScorePill: 'mt-1 text-[11px] font-bold text-marush-primary',
+  formCard: 'gap-3.5 rounded-[14px] border border-marush-border bg-white p-5',
+  formTitle: 'text-[17px] font-extrabold text-marush-primary',
+  formSub: 'mb-1.5 text-xs text-marush-muted',
+  inputGroup: 'gap-1',
+  label: 'text-xs font-bold text-marush-text',
+  input: 'rounded-lg border border-marush-border bg-marush-background px-3 py-2 text-[13px]',
+  row: 'flex-row flex-wrap gap-3',
+  empSelectHeader: 'flex-row flex-wrap items-center justify-between gap-2',
+  availCount: 'text-[11px] font-bold text-marush-secondary-dark',
+  noEmpBox: 'my-1 rounded-lg border border-marush-subtle bg-marush-subtle p-2.5',
+  noEmpWarning: 'text-xs italic text-marush-primary-dark',
+  empListGrid: 'mt-1.5 flex-row flex-wrap gap-2',
+  empPill: 'rounded-lg border border-marush-border bg-marush-subtle px-3 py-2',
+  empPillSelected: 'border-marush-secondary bg-marush-secondary',
+  empPillText: 'text-xs font-semibold text-marush-text',
+  empPillTextSelected: 'font-bold text-white',
+  submitProgBtn: 'mt-2 items-center rounded-[10px] bg-marush-primary py-3',
+  btnDisabled: 'opacity-70',
+  submitProgBtnText: 'text-sm font-bold text-white',
+  modalOverlay: 'flex-1 items-center justify-center bg-black/50 p-4',
+  modalCard: 'max-h-[90%] w-full max-w-[500px] rounded-2xl bg-white p-6',
+  modalTitle: 'text-lg font-extrabold text-marush-primary',
+  modalSub: 'mb-3 text-[13px] text-marush-muted',
+  modalScroll: 'mb-4',
+  toggleBtn: 'mt-0.5 items-center rounded-lg py-2',
+  toggleBtnPassed: 'bg-marush-subtle',
+  toggleBtnFailed: 'bg-marush-subtle',
+  toggleBtnText: 'text-xs font-bold text-marush-text',
+  modalBtnRow: 'flex-row flex-wrap justify-end gap-2.5',
+  cancelModalBtn: 'min-w-[96px] flex-1 items-center px-3.5 py-2',
+  cancelModalBtnText: 'font-semibold text-marush-muted',
+  confirmModalBtn: 'min-w-[160px] flex-1 items-center rounded-lg bg-marush-secondary-dark px-4 py-2',
+  confirmModalBtnText: 'font-bold text-white',
+};

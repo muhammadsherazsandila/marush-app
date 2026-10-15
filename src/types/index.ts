@@ -14,6 +14,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: UserRole;
+  requestedRole?: UserRole;
   status: UserStatus;
   phone?: string;
   employeeCode?: string;
@@ -116,6 +117,7 @@ export interface Database {
           email: string;
           full_name: string;
           role: UserRole;
+          requested_role: UserRole | null;
           status: UserStatus;
           phone: string | null;
           employee_code: string | null;
@@ -129,6 +131,7 @@ export interface Database {
           email: string;
           full_name: string;
           role?: UserRole;
+          requested_role?: UserRole | null;
           status?: UserStatus;
           phone?: string | null;
           employee_code?: string | null;
@@ -142,6 +145,7 @@ export interface Database {
           email?: string;
           full_name?: string;
           role?: UserRole;
+          requested_role?: UserRole | null;
           status?: UserStatus;
           phone?: string | null;
           employee_code?: string | null;

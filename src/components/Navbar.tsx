@@ -1,135 +1,55 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, View, useWindowDimensions, Platform } from 'react-native';
+import { ShieldCheck, Sparkles } from 'lucide-react-native';
 import { Colors } from '../constants/colors';
-import { UserProfile } from '../types';
 import { MarushLogo } from './MarushLogo';
 
-interface NavbarProps {
-  user: UserProfile;
-  onLogout: () => void;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return { label: 'Admin', bg: Colors.accent, text: '#FFF' };
-      case 'program_controller':
-        return { label: 'Controller', bg: Colors.secondary, text: '#FFF' };
-      case 'program_auditor':
-        return { label: 'Auditor', bg: '#8B5CF6', text: '#FFF' };
-      default:
-        return { label: 'Employee', bg: Colors.primaryLight, text: '#FFF' };
-    }
-  };
-
-  const badge = getRoleBadge(user.role);
+export const Navbar: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 480;
+  const isMobile = width < 700;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.brandGroup}>
-        <MarushLogo size="sm" variant="mark" />
-        <View style={styles.titleWrapper}>
-          <Text style={styles.brandTitle}>MARUSH</Text>
-          <Text style={styles.brandSub}>Ceva Sole Distributor</Text>
-        </View>
-      </View>
-
-      <View style={styles.userSection}>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName} numberOfLines={1}>
-            {user.fullName}
-          </Text>
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.badgeText, { color: badge.text }]}>
-              {badge.label}
-            </Text>
+    <View className="border-b border-marush-border bg-white">
+      <View
+        className={`mx-auto w-full max-w-[1480px] flex-row items-center justify-between ${
+          isCompact ? 'min-h-[68px] gap-2 px-4 py-2.5' : isMobile ? 'min-h-[72px] gap-3 px-5 py-3' : 'min-h-[78px] gap-4 px-8 py-3.5'
+        }`}
+      >
+        <View className={`${isCompact ? 'gap-2.5' : 'gap-3.5'} min-w-0 flex-1 flex-row items-center`}>
+          <MarushLogo size="nav" variant="mark" framed={false} />
+          <View className="min-w-0">
+            <View className="flex-row items-center gap-1.5">
+              <Text className={`${isCompact ? 'text-[13px] tracking-[1.5px]' : 'text-[14px] tracking-[1.8px]'} font-black text-marush-primary`}>
+                MARUSH
+              </Text>
+              <View className="rounded-full bg-marush-primary-subtle px-1.5 py-0.5">
+                <Text className="text-[9px] font-bold text-marush-primary tracking-wider">CEVA</Text>
+              </View>
+            </View>
+            {!isCompact ? (
+              <Text className="text-[10px] font-medium tracking-tight text-marush-muted">
+                Poultry Health & Monitoring
+              </Text>
+            ) : (
+              <Text className="text-[9px] font-medium tracking-tight text-marush-muted">
+                Poultry health
+              </Text>
+            )}
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={onLogout}
-          accessibilityLabel="Sign out"
-        >
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View className={`${isCompact ? 'gap-1.5 px-3 py-2' : 'gap-2 px-3.5 py-2'} flex-row items-center rounded-full border border-marush-border bg-marush-subtle`}>
+          <ShieldCheck size={isCompact ? 16 : 15} color={Colors.primary} strokeWidth={2.2} />
+          {!isCompact ? (
+            <Text className="text-[11px] font-semibold tracking-wide text-marush-primary">
+              Enterprise Secure
+            </Text>
+          ) : (
+            <Text className="text-[10px] font-semibold text-marush-primary">Live</Text>
+          )}
+        </View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  titleWrapper: {
-    marginLeft: 8,
-  },
-  brandTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.primary,
-    letterSpacing: 1,
-  },
-  brandSub: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  userSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  userInfo: {
-    alignItems: 'flex-end',
-  },
-  userName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    maxWidth: 140,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginTop: 2,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#F8FAFC',
-  },
-  logoutText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-});

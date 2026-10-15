@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -10,22 +9,40 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import {
+  Activity,
+  Check,
+  ClipboardCheck,
+  Clock3,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserCheck,
+  Users,
+  X,
+} from 'lucide-react-native';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, UserRole } from '../types';
-import { dataProvider, mockStore } from '../services/supabase';
+import { dataProvider } from '../services';
 
 interface AdminDashboardProps {
   currentUser: UserProfile;
+  activeArea: 'overview' | 'programs';
 }
 
-type TabType = 'overview' | 'programs' | 'active_programs' | 'employees' | 'approvals';
+type TabType = 'overview' | 'all_programs' | 'programs' | 'active_programs' | 'pending_audit' | 'employees' | 'approvals';
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [users, setUsers] = useState<UserProfile[]>(mockStore.getUsers());
-  const [programs, setPrograms] = useState<Program[]>(mockStore.getPrograms());
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [employeeRoleFilter, setEmployeeRoleFilter] = useState<'all' | UserRole>('all');
 
   // Employee CRUD Modal State
   const [isEmpModalOpen, setIsEmpModalOpen] = useState(false);
@@ -52,10 +69,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
       ]);
       setUsers(latestUsers);
       setPrograms(latestPrograms);
-    } catch {
-      // Fallback to local store
-      setUsers(mockStore.getUsers());
-      setPrograms(mockStore.getPrograms());
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Unable to load administration data',
+        text2: error?.message || 'Check your connection and try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -65,9 +84,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     refreshData();
   }, [refreshData]);
 
+  useEffect(() => {
+    setActiveTab(activeArea === 'programs' ? 'all_programs' : 'overview');
+    setSearchQuery('');
+  }, [activeArea]);
+
   const completedPrograms = programs.filter(p => p.status === 'completed');
   const activeProgramsList = programs.filter(p => p.status === 'active');
   const pendingTeamPrograms = programs.filter(p => p.status === 'pending_approval');
+  const pendingAuditPrograms = programs.filter(p => p.status === 'pending_audit');
   const pendingUsers = users.filter(u => u.status === 'pending');
   const auditors = users.filter(u => u.role === 'program_auditor' && u.status === 'approved');
 
@@ -78,6 +103,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.employeeCode && u.employeeCode.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+  const visibleEmployees = filteredUsers.filter(
+    user => employeeRoleFilter === 'all' || user.role === employeeRoleFilter
+  );
+  const approvedEmployeeCount = users.filter(user => user.status === 'approved').length;
+  const pendingEmployeeCount = users.filter(user => user.status === 'pending').length;
 
   const filteredCompletedPrograms = completedPrograms.filter(
     p =>
@@ -98,6 +128,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   };
 
   const handleOpenEditEmp = (emp: UserProfile) => {
+    if (emp.role === 'admin') {
+      Toast.show({
+        type: 'error',
+        text1: 'Action Not Permitted',
+        text2: 'Administrator role cannot be changed. Contact the developer for assistance.',
+      });
+      return;
+    }
     setEditingEmp(emp);
     setEmpFullName(emp.fullName);
     setEmpEmail(emp.email);
@@ -114,8 +152,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     }
 
     if (editingEmp) {
-      await dataProvider.updateUserRole(editingEmp.id, empRole);
-      Toast.show({ type: 'success', text1: 'Updated', text2: `${empFullName} role updated.` });
+      if (editingEmp.role === 'admin') {
+        Toast.show({
+          type: 'error',
+          text1: 'Action Not Permitted',
+          text2: 'Administrator role cannot be changed. Contact the developer for assistance.',
+        });
+        return;
+      }
+      try {
+        await dataProvider.updateUserRole(editingEmp.id, empRole);
+        Toast.show({ type: 'success', text1: 'Updated', text2: `${empFullName} role updated.` });
+      } catch (err: any) {
+        Toast.show({ type: 'error', text1: 'Update Failed', text2: err?.message || 'Could not update role.' });
+        return;
+      }
     } else {
       await dataProvider.addUser({
         fullName: empFullName.trim(),
@@ -132,10 +183,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     refreshData();
   };
 
-  const handleDeleteEmployee = async (id: string) => {
-    await dataProvider.deleteUser(id);
-    Toast.show({ type: 'info', text1: 'Deleted', text2: 'Employee removed from system.' });
-    refreshData();
+  const handleDeleteEmployee = async (targetUser: UserProfile) => {
+    if (targetUser.role === 'admin') {
+      Toast.show({
+        type: 'error',
+        text1: 'Action Not Permitted',
+        text2: 'Administrator accounts cannot be deleted. Contact the developer for assistance.',
+      });
+      return;
+    }
+    try {
+      await dataProvider.deleteUser(targetUser.id);
+      Toast.show({ type: 'info', text1: 'Deleted', text2: `${targetUser.fullName || 'Employee'} removed from system.` });
+      refreshData();
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Deletion Failed',
+        text2: err?.message || 'Could not delete employee.',
+      });
+    }
   };
 
   const handleApproveUser = async (id: string) => {
@@ -175,93 +242,181 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
     refreshData();
   };
 
+  const isProgramView =
+    activeArea === 'programs' ||
+    ['all_programs', 'active_programs', 'pending_audit', 'programs'].includes(activeTab);
+
   return (
-    <View style={styles.container}>
+    <View className={styles.container}>
       {/* Tab Navigation & Refresh */}
-      <View style={styles.navTabs}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
-          {[
-            { id: 'overview', label: 'Overview' },
-            { id: 'active_programs', label: `Active Programs (${activeProgramsList.length})` },
-            { id: 'programs', label: `All Programs Done (${completedPrograms.length})` },
-            { id: 'employees', label: `Employees (${users.length})` },
-            { id: 'approvals', label: `Pending Approvals (${pendingUsers.length + pendingTeamPrograms.length})` },
-          ].map(tab => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tabItem, activeTab === tab.id && styles.activeTabItem]}
-              onPress={() => {
-                setActiveTab(tab.id as TabType);
-                setSearchQuery('');
-              }}
-            >
-              <Text style={[styles.tabItemText, activeTab === tab.id && styles.activeTabItemText]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading}>
+      <View className={styles.navTabs}>
+        <View className={styles.navInner}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName={styles.tabsScroll}>
+            {(isProgramView ? [
+              { id: 'all_programs', label: `All (${programs.length})` },
+              { id: 'active_programs', label: `Active (${activeProgramsList.length})` },
+              { id: 'approvals', label: `Awaiting approval (${pendingTeamPrograms.length})` },
+              { id: 'pending_audit', label: `Pending audit (${pendingAuditPrograms.length})` },
+              { id: 'programs', label: `Completed (${completedPrograms.length})` },
+            ] : [
+              { id: 'overview', label: 'Overview' },
+              { id: 'employees', label: `Employees (${users.length})` },
+              { id: 'approvals', label: `Access requests (${pendingUsers.length})` },
+            ]).map(tab => (
+              <TouchableOpacity
+                key={tab.id}
+                className={`${styles.tabItem} ${activeTab === tab.id ? styles.activeTabItem : ''}`}
+                onPress={() => {
+                  setActiveTab(tab.id as TabType);
+                  setSearchQuery('');
+                }}
+              >
+                <Text className={`${styles.tabItemText} ${activeTab === tab.id ? styles.activeTabItemText : ''}`}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity className={styles.refreshBtn} onPress={refreshData} disabled={loading}>
             {loading ? (
               <ActivityIndicator size="small" color={Colors.primary} />
             ) : (
-              <Text style={styles.refreshBtnText}>↻ Refresh</Text>
+              <View className="flex-row items-center gap-1.5">
+                <RefreshCw size={15} color={Colors.primary} />
+                <Text className={styles.refreshBtnText}>Refresh</Text>
+              </View>
             )}
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerClassName={styles.content}>
+        {activeTab === 'all_programs' && (
+          <View className={styles.tabSection}>
+            <Text className={styles.sectionHeading}>All programs</Text>
+            {programs.length === 0 ? <View className={styles.emptyBox}><Text className={styles.emptyText}>No programs have been created yet.</Text></View> :
+              programs.map(prog => <TouchableOpacity key={prog.id} className={styles.programCard} onPress={() => setSelectedProgram(prog)}>
+                <View className={styles.progHeaderRow}><Text className={styles.progTitle}>{prog.programName}</Text><View className={styles.activeTag}><Text className={styles.activeTagText}>{prog.status.replace('_', ' ').toUpperCase()}</Text></View></View>
+                <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                <Text className={styles.progMeta}>Controller: {prog.controllerName || 'Unassigned'} Ã‚Â· {prog.flockSize.toLocaleString()} birds</Text>
+              </TouchableOpacity>)}
+          </View>
+        )}
+
         {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
-          <View style={styles.tabSection}>
-            <Text style={styles.sectionHeading}>Operations & Program Summary</Text>
-            <View style={styles.metricsGrid}>
-              <View style={[styles.metricCard, { borderLeftColor: Colors.primary }]}>
-                <Text style={styles.metricLabel}>Total Programs Done</Text>
-                <Text style={[styles.metricValue, { color: Colors.primary }]}>
-                  {completedPrograms.length}
+          <View className={styles.tabSection}>
+            <View className={styles.pageHeader}>
+              <View className={styles.pageHeaderCopy}>
+                <Text className={styles.eyebrow}>ADMINISTRATION / OVERVIEW</Text>
+                <Text className={styles.sectionHeading}>Operations & Program Summary</Text>
+                <Text className={styles.sectionDescription}>
+                  Monitor program delivery, team approvals, and staff access from one place.
                 </Text>
               </View>
-
-              <View style={[styles.metricCard, { borderLeftColor: Colors.secondary }]}>
-                <Text style={styles.metricLabel}>Currently Active</Text>
-                <Text style={[styles.metricValue, { color: Colors.secondary }]}>
-                  {activeProgramsList.length}
-                </Text>
-              </View>
-
-              <View style={[styles.metricCard, { borderLeftColor: Colors.accent }]}>
-                <Text style={styles.metricLabel}>Pending Team Approvals</Text>
-                <Text style={[styles.metricValue, { color: Colors.accent }]}>
-                  {pendingTeamPrograms.length}
-                </Text>
-              </View>
-
-              <View style={[styles.metricCard, { borderLeftColor: '#8B5CF6' }]}>
-                <Text style={styles.metricLabel}>Pending Staff Signups</Text>
-                <Text style={[styles.metricValue, { color: '#8B5CF6' }]}>
-                  {pendingUsers.length}
-                </Text>
+              <View className={styles.statusPill}>
+                <Activity size={14} color={Colors.primary} strokeWidth={2.5} />
+                <Text className={styles.statusPillText}>Live overview</Text>
               </View>
             </View>
 
+            <View className={styles.metricsGrid}>
+              <TouchableOpacity
+                className={`${styles.metricCard} border-l-marush-primary active:opacity-80`}
+                onPress={() => setActiveTab('programs')}
+                accessibilityRole="button"
+                accessibilityLabel="View completed programs"
+              >
+                <View className={styles.metricCardHeader}>
+                  <View className="rounded-lg bg-marush-primary-subtle p-2">
+                    <Check size={16} color={Colors.primary} strokeWidth={2.5} />
+                  </View>
+                  <Text className={styles.metricTrend}>Completed</Text>
+                </View>
+                <Text className={`${styles.metricValue} text-marush-primary`}>{completedPrograms.length}</Text>
+                <Text className={styles.metricSupporting}>Programs completed</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className={`${styles.metricCard} border-l-marush-secondary active:opacity-80`}
+                onPress={() => setActiveTab('active_programs')}
+                accessibilityRole="button"
+                accessibilityLabel="View active programs"
+              >
+                <View className={styles.metricCardHeader}>
+                  <View className="rounded-lg bg-marush-subtle p-2">
+                    <Activity size={16} color={Colors.secondaryDark} strokeWidth={2.5} />
+                  </View>
+                  <Text className={styles.metricTrend}>In progress</Text>
+                </View>
+                <Text className={`${styles.metricValue} text-marush-secondary`}>{activeProgramsList.length}</Text>
+                <Text className={styles.metricSupporting}>Programs active now</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className={`${styles.metricCard} border-l-amber-500 active:opacity-80`}
+                onPress={() => setActiveTab('approvals')}
+                accessibilityRole="button"
+                accessibilityLabel="View pending team approvals"
+              >
+                <View className={styles.metricCardHeader}>
+                  <View className="rounded-lg bg-amber-50 p-2">
+                    <Users size={16} color="#B45309" strokeWidth={2.5} />
+                  </View>
+                  <Text className={styles.metricTrend}>Needs review</Text>
+                </View>
+                <Text className="text-[28px] font-extrabold text-amber-700">{pendingTeamPrograms.length}</Text>
+                <Text className={styles.metricSupporting}>Team approvals pending</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className={`${styles.metricCard} border-l-blue-500 active:opacity-80`}
+                onPress={() => setActiveTab('approvals')}
+                accessibilityRole="button"
+                accessibilityLabel="View pending staff access requests"
+              >
+                <View className={styles.metricCardHeader}>
+                  <View className="rounded-lg bg-blue-50 p-2">
+                    <ShieldCheck size={16} color="#2563EB" strokeWidth={2.5} />
+                  </View>
+                  <Text className={styles.metricTrend}>Access</Text>
+                </View>
+                <Text className="text-[28px] font-extrabold text-blue-700">{pendingUsers.length}</Text>
+                <Text className={styles.metricSupporting}>Staff signups pending</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Quick Action: Recently Active */}
-            <View style={styles.recentSection}>
-              <Text style={styles.subHeading}>Active Programs In The Field</Text>
+            <View className={styles.recentSection}>
+              <View className={styles.sectionHeaderRow}>
+                <View>
+                  <Text className={styles.subHeading}>Active programs in the field</Text>
+                  <Text className={styles.sectionCaption}>A quick view of current operations</Text>
+                </View>
+                {activeProgramsList.length > 0 && (
+                  <Text className={styles.countCaption}>{activeProgramsList.length} active</Text>
+                )}
+              </View>
               {activeProgramsList.length === 0 ? (
-                <Text style={styles.emptyText}>No active programs running at the moment.</Text>
+                <View className={styles.emptyBox}>
+                  <View className="mb-2 rounded-full bg-marush-subtle p-3">
+                    <Activity size={20} color={Colors.primary} />
+                  </View>
+                  <Text className={styles.emptyTitle}>No active programs yet</Text>
+                  <Text className={styles.emptyText}>When a program starts, its live status will appear here.</Text>
+                </View>
               ) : (
                 activeProgramsList.map(prog => (
-                  <View key={prog.id} style={styles.programCard}>
-                    <View style={styles.progHeaderRow}>
-                      <Text style={styles.progTitle}>{prog.programName}</Text>
-                      <View style={styles.activeTag}>
-                        <Text style={styles.activeTagText}>IN PROGRESS</Text>
+                  <View key={prog.id} className={styles.programCard}>
+                    <View className={styles.progHeaderRow}>
+                      <Text className={styles.progTitle}>{prog.programName}</Text>
+                      <View className={styles.activeTag}>
+                        <Text className={styles.activeTagText}>IN PROGRESS</Text>
                       </View>
                     </View>
-                    <Text style={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
-                    <Text style={styles.progMeta}>
-                      Flock: {prog.flockSize.toLocaleString()} birds • Controller: {prog.controllerName}
+                    <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                    <Text className={styles.progMeta}>
+                      Flock: {prog.flockSize.toLocaleString()} birds Ã¢â‚¬Â¢ Controller: {prog.controllerName}
                     </Text>
                   </View>
                 ))
@@ -272,34 +427,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
 
         {/* ACTIVE PROGRAMS TAB */}
         {activeTab === 'active_programs' && (
-          <View style={styles.tabSection}>
-            <Text style={styles.sectionHeading}>Currently Active Programs</Text>
+          <View className={styles.tabSection}>
+            <Text className={styles.sectionHeading}>Currently Active Programs</Text>
             {activeProgramsList.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No programs are currently running.</Text>
+              <View className={styles.emptyBox}>
+                <Text className={styles.emptyText}>No programs are currently running.</Text>
               </View>
             ) : (
               activeProgramsList.map(prog => (
-                <View key={prog.id} style={styles.programCard}>
-                  <View style={styles.progHeaderRow}>
-                    <Text style={styles.progTitle}>{prog.programName}</Text>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>ACTIVE</Text>
+                <View key={prog.id} className={styles.programCard}>
+                  <View className={styles.progHeaderRow}>
+                    <Text className={styles.progTitle}>{prog.programName}</Text>
+                    <View className={styles.activeTag}>
+                      <Text className={styles.activeTagText}>ACTIVE</Text>
                     </View>
                   </View>
-                  <Text style={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
-                  <View style={styles.progDetailBox}>
-                    <Text style={styles.progDetailText}>
-                      <Text style={styles.bold}>Controller:</Text> {prog.controllerName}
+                  <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                  <View className={styles.progDetailBox}>
+                    <Text className={styles.progDetailText}>
+                      <Text className={styles.bold}>Controller:</Text> {prog.controllerName}
                     </Text>
-                    <Text style={styles.progDetailText}>
-                      <Text style={styles.bold}>Auditor:</Text> {prog.auditorName || 'Pending'}
+                    <Text className={styles.progDetailText}>
+                      <Text className={styles.bold}>Auditor:</Text> {prog.auditorName || 'Pending'}
                     </Text>
-                    <Text style={styles.progDetailText}>
-                      <Text style={styles.bold}>Scheduled:</Text> {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
+                    <Text className={styles.progDetailText}>
+                      <Text className={styles.bold}>Scheduled:</Text> {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
                     </Text>
-                    <Text style={styles.progDetailText}>
-                      <Text style={styles.bold}>Assigned Staff:</Text> {prog.teamMemberIds.length} members
+                    <Text className={styles.progDetailText}>
+                      <Text className={styles.bold}>Assigned Staff:</Text> {prog.teamMemberIds.length} members
                     </Text>
                   </View>
                 </View>
@@ -308,15 +463,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
           </View>
         )}
 
+        {activeTab === 'pending_audit' && (
+          <View className={styles.tabSection}>
+            <Text className={styles.sectionHeading}>Programs awaiting audit</Text>
+            {pendingAuditPrograms.length === 0 ? <View className={styles.emptyBox}><Text className={styles.emptyText}>No programs are awaiting audit.</Text></View> :
+              pendingAuditPrograms.map(prog => <TouchableOpacity key={prog.id} className={styles.programCard} onPress={() => setSelectedProgram(prog)}>
+                <View className={styles.progHeaderRow}><Text className={styles.progTitle}>{prog.programName}</Text><View className={styles.activeTag}><Text className={styles.activeTagText}>PENDING AUDIT</Text></View></View>
+                <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                <Text className={styles.progMeta}>Controller: {prog.controllerName || 'Unassigned'} Ã‚Â· Auditor: {prog.auditorName || 'Unassigned'}</Text>
+              </TouchableOpacity>)}
+          </View>
+        )}
+
         {/* ALL PROGRAMS DONE TAB */}
         {activeTab === 'programs' && (
-          <View style={styles.tabSection}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeading}>Completed Programs Archive</Text>
+          <View className={styles.tabSection}>
+            <View className={styles.sectionHeaderRow}>
+              <Text className={styles.sectionHeading}>Completed Programs Archive</Text>
             </View>
 
             <TextInput
-              style={styles.searchBar}
+              className={styles.searchBar}
               placeholder="Search programs by name, location, or controller..."
               placeholderTextColor={Colors.textMuted}
               value={searchQuery}
@@ -324,32 +491,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
             />
 
             {filteredCompletedPrograms.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No matching completed programs found.</Text>
+              <View className={styles.emptyBox}>
+                <Text className={styles.emptyText}>No matching completed programs found.</Text>
               </View>
             ) : (
               filteredCompletedPrograms.map(prog => (
                 <TouchableOpacity
                   key={prog.id}
-                  style={styles.programCard}
+                  className={styles.programCard}
                   onPress={() => setSelectedProgram(prog)}
                 >
-                  <View style={styles.progHeaderRow}>
-                    <Text style={styles.progTitle}>{prog.programName}</Text>
-                    <View style={styles.completedTag}>
-                      <Text style={styles.completedTagText}>DONE</Text>
+                  <View className={styles.progHeaderRow}>
+                    <Text className={styles.progTitle}>{prog.programName}</Text>
+                    <View className={styles.completedTag}>
+                      <Text className={styles.completedTagText}>DONE</Text>
                     </View>
                   </View>
-                  <Text style={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
-                  <Text style={styles.progMeta}>
-                    Controller: {prog.controllerName} • Auditor: {prog.auditorName}
+                  <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                  <Text className={styles.progMeta}>
+                    Controller: {prog.controllerName} Ã¢â‚¬Â¢ Auditor: {prog.auditorName}
                   </Text>
                   {prog.auditScore ? (
-                    <Text style={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
+                    <Text className={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
                   ) : null}
                   {prog.auditorRemarks ? (
-                    <View style={styles.remarksSnippet}>
-                      <Text style={styles.remarksText} numberOfLines={2}>
+                    <View className={styles.remarksSnippet}>
+                      <Text className={styles.remarksText} numberOfLines={2}>
                         "{prog.auditorRemarks}"
                       </Text>
                     </View>
@@ -362,60 +529,146 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
 
         {/* EMPLOYEES TAB (CRUD) */}
         {activeTab === 'employees' && (
-          <View style={styles.tabSection}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeading}>Employee Directory</Text>
-              <TouchableOpacity style={styles.addButton} onPress={handleOpenAddEmp}>
-                <Text style={styles.addButtonText}>+ Add Employee</Text>
+          <View className={styles.tabSection}>
+            <View className={styles.pageHeader}>
+              <View className={styles.pageHeaderCopy}>
+                <Text className={styles.eyebrow}>PEOPLE / DIRECTORY</Text>
+                <Text className={styles.sectionHeading}>Employee directory</Text>
+                <Text className={styles.sectionDescription}>
+                  Manage team access, roles, and employee records across Marush operations.
+                </Text>
+              </View>
+              <TouchableOpacity className={styles.addButton} onPress={handleOpenAddEmp}>
+                <View className="flex-row items-center gap-1.5">
+                  <Plus size={15} color={Colors.white} />
+                  <Text className={styles.addButtonText}>Add employee</Text>
+                </View>
               </TouchableOpacity>
             </View>
 
-            <TextInput
-              style={styles.searchBar}
-              placeholder="Search by name, email, or employee code..."
-              placeholderTextColor={Colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+            <View className={styles.directorySummary}>
+              <View className={styles.directorySummaryItem}>
+                <Text className={styles.directorySummaryValue}>{users.length}</Text>
+                <Text className={styles.directorySummaryLabel}>Total people</Text>
+              </View>
+              <View className={styles.directorySummaryDivider} />
+              <View className={styles.directorySummaryItem}>
+                <Text className="text-lg font-extrabold text-marush-primary">{approvedEmployeeCount}</Text>
+                <Text className={styles.directorySummaryLabel}>Approved</Text>
+              </View>
+              <View className={styles.directorySummaryDivider} />
+              <View className={styles.directorySummaryItem}>
+                <Text className="text-lg font-extrabold text-amber-700">{pendingEmployeeCount}</Text>
+                <Text className={styles.directorySummaryLabel}>Pending</Text>
+              </View>
+            </View>
 
-            {filteredUsers.map(emp => (
-              <View key={emp.id} style={styles.employeeCard}>
-                <View style={styles.empHeader}>
-                  <View>
-                    <Text style={styles.empName}>{emp.fullName}</Text>
-                    <Text style={styles.empEmail}>{emp.email}</Text>
-                    <Text style={styles.empCode}>{emp.employeeCode || 'N/A'}</Text>
-                    {emp.phone ? <Text style={styles.empPhone}>{emp.phone}</Text> : null}
-                  </View>
-                  <View style={styles.empBadgeGroup}>
-                    <View style={[styles.roleBadge, { backgroundColor: Colors.primaryLight }]}>
-                      <Text style={styles.roleBadgeText}>{emp.role.replace('_', ' ').toUpperCase()}</Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: emp.status === 'approved' ? '#D1FAE5' : '#FEF3C7' },
-                      ]}
+            <View className={styles.directoryToolbar}>
+              <View className={styles.searchWrapper}>
+                <Search size={16} color={Colors.textMuted} />
+                <TextInput
+                  className={styles.searchInput}
+                  placeholder="Search name, email, or employee code"
+                  placeholderTextColor={Colors.textMuted}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName={styles.filterScroll}
+              >
+                {([
+                  ['all', 'All people'],
+                  ['employee', 'Employees'],
+                  ['program_controller', 'Controllers'],
+                  ['program_auditor', 'Auditors'],
+                  ['admin', 'Admins'],
+                ] as const).map(([role, label]) => (
+                  <TouchableOpacity
+                    key={role}
+                    className={styles.filterChip}
+                    style={{
+                      backgroundColor: employeeRoleFilter === role ? Colors.primary : Colors.white,
+                      borderColor: employeeRoleFilter === role ? Colors.primary : Colors.border,
+                    }}
+                    onPress={() => setEmployeeRoleFilter(role)}
+                  >
+                    <Text
+                      className={styles.filterChipText}
+                      style={{
+                        color: employeeRoleFilter === role ? Colors.white : Colors.textSecondary,
+                      }}
                     >
-                      <Text
-                        style={[
-                          styles.statusBadgeText,
-                          { color: emp.status === 'approved' ? '#065F46' : '#92400E' },
-                        ]}
-                      >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {visibleEmployees.length === 0 ? (
+              <View className={styles.directoryEmptyState}>
+                <View className="mb-3 rounded-full bg-marush-subtle p-3">
+                  <Users size={22} color={Colors.primary} />
+                </View>
+                <Text className={styles.emptyTitle}>
+                  {searchQuery || employeeRoleFilter !== 'all' ? 'No matching employees' : 'No employees yet'}
+                </Text>
+                <Text className={styles.emptyText}>
+                  {searchQuery || employeeRoleFilter !== 'all'
+                    ? 'Try a different search term or clear the role filter.'
+                    : 'Add your first employee to start building the operations directory.'}
+                </Text>
+              </View>
+            ) : visibleEmployees.map(emp => (
+              <View key={emp.id} className={styles.employeeCard}>
+                <View className={styles.empHeader}>
+                  <View className={styles.employeeIdentity}>
+                    <View className={styles.employeeAvatar}>
+                      <Text className={styles.employeeAvatarText}>
+                        {emp.fullName.trim().slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text className={styles.empName}>{emp.fullName}</Text>
+                      <Text className={styles.empEmail}>{emp.email}</Text>
+                    </View>
+                  </View>
+                  <View className={styles.empBadgeGroup}>
+                    <View className={`${styles.roleBadge} bg-marush-primary-light`}>
+                      <Text className={styles.roleBadgeText}>{emp.role.replace('_', ' ').toUpperCase()}</Text>
+                    </View>
+                    <View className={`${styles.statusBadge} ${emp.status === 'approved' ? 'bg-marush-primary-subtle' : 'bg-amber-50'}`}>
+                      <Text className={`${styles.statusBadgeText} ${emp.status === 'approved' ? 'text-marush-primary' : 'text-amber-700'}`}>
                         {emp.status.toUpperCase()}
                       </Text>
                     </View>
                   </View>
                 </View>
+                <View className={styles.employeeDetails}>
+                  <Text className={styles.empCode}>ID {emp.employeeCode || 'Not assigned'}</Text>
+                  {emp.phone ? <Text className={styles.empPhone}>{emp.phone}</Text> : null}
+                </View>
 
-                <View style={styles.empActionRow}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => handleOpenEditEmp(emp)}>
-                    <Text style={styles.editBtnText}>Edit Role</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteEmployee(emp.id)}>
-                    <Text style={styles.deleteBtnText}>Delete</Text>
-                  </TouchableOpacity>
+                <View className={styles.empActionRow}>
+                  {emp.role !== 'admin' && (
+                    <TouchableOpacity className={styles.editBtn} onPress={() => handleOpenEditEmp(emp)}>
+                      <View className="flex-row items-center gap-1.5">
+                        <Pencil size={14} color={Colors.primary} />
+                        <Text className={styles.editBtnText}>Edit Role</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  {emp.role !== 'admin' && (
+                    <TouchableOpacity className={styles.deleteBtn} onPress={() => handleDeleteEmployee(emp)}>
+                      <View className="flex-row items-center gap-1.5">
+                        <Trash2 size={14} color={Colors.danger} />
+                        <Text className={styles.deleteBtnText}>Delete</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             ))}
@@ -424,51 +677,141 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
 
         {/* APPROVALS TAB */}
         {activeTab === 'approvals' && (
-          <View style={styles.tabSection}>
-            <Text style={styles.sectionHeading}>Pending Program Teams</Text>
+          <View className={styles.tabSection}>
+            <View className={styles.pageHeader}>
+              <View className={styles.pageHeaderCopy}>
+                <Text className={styles.eyebrow}>ACCESS / REVIEW QUEUE</Text>
+                <Text className={styles.sectionHeading}>Access requests</Text>
+                <Text className={styles.sectionDescription}>
+                  Review new team access requests and approve the right people for your operations.
+                </Text>
+              </View>
+              <View className="rounded-full bg-amber-50 px-3 py-2">
+                <Text className="text-[11px] font-bold text-amber-700">
+                  {pendingUsers.length} awaiting review
+                </Text>
+              </View>
+            </View>
+
+            <View className={styles.requestSummary}>
+              <View className={styles.requestSummaryIcon}>
+                <Clock3 size={18} color="#B45309" strokeWidth={2.5} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className={styles.requestSummaryTitle}>
+                  {pendingUsers.length === 0 ? 'All access requests are up to date' : 'Requests need your attention'}
+                </Text>
+                <Text className={styles.requestSummaryText}>
+                  {pendingUsers.length === 0
+                    ? 'New registration requests will appear here for review.'
+                    : 'Verify each applicant’s designation before approving account access.'}
+                </Text>
+              </View>
+            </View>
+
+            <View className={styles.sectionHeaderRow}>
+              <View>
+                <Text className={styles.subHeading}>Pending program teams</Text>
+                <Text className={styles.sectionCaption}>Start approved teams and assign an auditor</Text>
+              </View>
+              {pendingTeamPrograms.length > 0 && (
+                <Text className={styles.countCaption}>{pendingTeamPrograms.length} pending</Text>
+              )}
+            </View>
             {pendingTeamPrograms.length === 0 ? (
-              <Text style={styles.emptyText}>No program teams pending approval.</Text>
+              <View className={styles.compactEmptyState}>
+                <Text className={styles.emptyTitle}>No teams awaiting approval</Text>
+                <Text className={styles.emptyText}>Approved program teams will appear here.</Text>
+              </View>
             ) : (
               pendingTeamPrograms.map(prog => (
-                <View key={prog.id} style={styles.approvalCard}>
-                  <Text style={styles.approvalTitle}>{prog.programName}</Text>
-                  <Text style={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
-                  <Text style={styles.progMeta}>
-                    Controller: {prog.controllerName} • Team: {prog.teamMemberIds.length} members
+                <View key={prog.id} className={styles.approvalCard}>
+                  <Text className={styles.approvalTitle}>{prog.programName}</Text>
+                  <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
+                  <Text className={styles.progMeta}>
+                    Controller: {prog.controllerName} Ã¢â‚¬Â¢ Team: {prog.teamMemberIds.length} members
                   </Text>
                   <TouchableOpacity
-                    style={styles.approveTeamBtn}
+                    className={styles.approveTeamBtn}
                     onPress={() => handleOpenTeamApproval(prog)}
                   >
-                    <Text style={styles.approveTeamBtnText}>Assign Auditor & Start Program</Text>
+                    <View className="flex-row items-center justify-center gap-2">
+                      <ShieldCheck size={15} color={Colors.white} />
+                      <Text className={styles.approveTeamBtnText}>Assign Auditor & Start Program</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               ))
             )}
 
-            <Text style={[styles.sectionHeading, { marginTop: 24 }]}>Pending User Registrations</Text>
+            <View className="mt-5">
+              <View className={styles.sectionHeaderRow}>
+                <View>
+                  <Text className={styles.subHeading}>New user registrations</Text>
+                  <Text className={styles.sectionCaption}>Confirm identity and requested access level</Text>
+                </View>
+                {pendingUsers.length > 0 && (
+                  <Text className={styles.countCaption}>{pendingUsers.length} pending</Text>
+                )}
+              </View>
+            </View>
             {pendingUsers.length === 0 ? (
-              <Text style={styles.emptyText}>No pending user accounts.</Text>
+              <View className={styles.compactEmptyState}>
+                <View className="mb-2 rounded-full bg-marush-primary-subtle p-2.5">
+                  <UserCheck size={18} color={Colors.primary} />
+                </View>
+                <Text className={styles.emptyTitle}>No new registrations</Text>
+                <Text className={styles.emptyText}>New access requests will appear here.</Text>
+              </View>
             ) : (
               pendingUsers.map(user => (
-                <View key={user.id} style={styles.approvalCard}>
-                  <Text style={styles.approvalTitle}>{user.fullName}</Text>
-                  <Text style={styles.progLocation}>{user.email}</Text>
-                  <Text style={styles.progMeta}>
-                    Requested Role: {user.role.replace('_', ' ').toUpperCase()}
-                  </Text>
-                  <View style={styles.approvalBtnRow}>
+                <View key={user.id} className={styles.approvalCard}>
+                  <View className={styles.requestCardHeader}>
+                    <View className={styles.employeeIdentity}>
+                      <View className={styles.employeeAvatar}>
+                        <Text className={styles.employeeAvatarText}>
+                          {user.fullName.trim().slice(0, 1).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View className="min-w-0 flex-1">
+                        <Text className={styles.approvalTitle}>{user.fullName}</Text>
+                        <Text className={styles.progLocation}>{user.email}</Text>
+                      </View>
+                    </View>
+                    <View className="rounded-full bg-amber-50 px-2.5 py-1">
+                      <Text className="text-[10px] font-bold text-amber-700">PENDING</Text>
+                    </View>
+                  </View>
+                  <View className={styles.requestDetails}>
+                    <View>
+                      <Text className={styles.requestDetailLabel}>Requested access</Text>
+                      <Text className={styles.requestDetailValue}>
+                        {(user.requestedRole || user.role).replace('_', ' ')}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text className={styles.requestDetailLabel}>Current access</Text>
+                      <Text className={styles.requestDetailValue}>{user.role.replace('_', ' ')}</Text>
+                    </View>
+                  </View>
+                  <View className={styles.approvalBtnRow}>
                     <TouchableOpacity
-                      style={styles.approveUserBtn}
+                      className={styles.approveUserBtn}
                       onPress={() => handleApproveUser(user.id)}
                     >
-                      <Text style={styles.approveUserBtnText}>Approve Account</Text>
+                      <View className="flex-row items-center justify-center gap-1.5">
+                        <Check size={15} color={Colors.white} />
+                        <Text className={styles.approveUserBtnText}>Approve Account</Text>
+                      </View>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.rejectUserBtn}
+                      className={styles.rejectUserBtn}
                       onPress={() => handleRejectUser(user.id)}
                     >
-                      <Text style={styles.rejectUserBtnText}>Reject</Text>
+                      <View className="flex-row items-center justify-center gap-1.5">
+                        <X size={15} color={Colors.white} />
+                        <Text className={styles.rejectUserBtnText}>Reject</Text>
+                      </View>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -481,68 +824,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
       {/* Program Inspection Modal */}
       {selectedProgram && (
         <Modal visible transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>{selectedProgram.programName}</Text>
-              <Text style={styles.modalSub}>{selectedProgram.hatcheryOrFarmName}</Text>
+          <View className={styles.modalOverlay}>
+            <View className={styles.modalCard}>
+              <Text className={styles.modalTitle}>{selectedProgram.programName}</Text>
+              <Text className={styles.modalSub}>{selectedProgram.hatcheryOrFarmName}</Text>
 
-              <ScrollView style={styles.modalBody}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Status:</Text>
-                  <Text style={[styles.detailValue, { color: Colors.success, fontWeight: '800' }]}>
+              <ScrollView className={styles.modalBody}>
+                <View className={styles.detailRow}>
+                  <Text className={styles.detailLabel}>Status:</Text>
+                  <Text className={`${styles.detailValue} font-extrabold text-marush-primary-light`}>
                     COMPLETED
                   </Text>
                 </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Controller:</Text>
-                  <Text style={styles.detailValue}>{selectedProgram.controllerName}</Text>
+                <View className={styles.detailRow}>
+                  <Text className={styles.detailLabel}>Controller:</Text>
+                  <Text className={styles.detailValue}>{selectedProgram.controllerName}</Text>
                 </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Auditor:</Text>
-                  <Text style={styles.detailValue}>{selectedProgram.auditorName}</Text>
+                <View className={styles.detailRow}>
+                  <Text className={styles.detailLabel}>Auditor:</Text>
+                  <Text className={styles.detailValue}>{selectedProgram.auditorName}</Text>
                 </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Flock Size:</Text>
-                  <Text style={styles.detailValue}>{selectedProgram.flockSize.toLocaleString()} birds</Text>
+                <View className={styles.detailRow}>
+                  <Text className={styles.detailLabel}>Flock Size:</Text>
+                  <Text className={styles.detailValue}>{selectedProgram.flockSize.toLocaleString()} birds</Text>
                 </View>
 
                 {selectedProgram.completionMetrics && (
-                  <View style={styles.metricsBox}>
-                    <Text style={styles.metricsBoxTitle}>Vaccination & Monitoring Metrics</Text>
-                    <Text style={styles.metricLine}>
-                      • Birds Vaccinated: {selectedProgram.completionMetrics.birdsVaccinated.toLocaleString()}
+                  <View className={styles.metricsBox}>
+                    <Text className={styles.metricsBoxTitle}>Vaccination & Monitoring Metrics</Text>
+                    <Text className={styles.metricLine}>
+                      Ã¢â‚¬Â¢ Birds Vaccinated: {selectedProgram.completionMetrics.birdsVaccinated.toLocaleString()}
                     </Text>
-                    <Text style={styles.metricLine}>
-                      • Dosage: {selectedProgram.completionMetrics.dosagePerBird}
+                    <Text className={styles.metricLine}>
+                      Ã¢â‚¬Â¢ Dosage: {selectedProgram.completionMetrics.dosagePerBird}
                     </Text>
-                    <Text style={styles.metricLine}>
-                      • Vaccine Type: {selectedProgram.completionMetrics.vaccineType}
+                    <Text className={styles.metricLine}>
+                      Ã¢â‚¬Â¢ Vaccine Type: {selectedProgram.completionMetrics.vaccineType}
                     </Text>
-                    <Text style={styles.metricLine}>
-                      • Batch #: {selectedProgram.completionMetrics.batchNumber}
+                    <Text className={styles.metricLine}>
+                      Ã¢â‚¬Â¢ Batch #: {selectedProgram.completionMetrics.batchNumber}
                     </Text>
-                    <Text style={styles.metricLine}>
-                      • Cold Chain Temp: {selectedProgram.completionMetrics.coldChainTempCelsius}°C
+                    <Text className={styles.metricLine}>
+                      Ã¢â‚¬Â¢ Cold Chain Temp: {selectedProgram.completionMetrics.coldChainTempCelsius}Ã‚Â°C
                     </Text>
-                    <Text style={styles.metricLine}>
-                      • Observations: {selectedProgram.completionMetrics.farmFlockObservations}
+                    <Text className={styles.metricLine}>
+                      Ã¢â‚¬Â¢ Observations: {selectedProgram.completionMetrics.farmFlockObservations}
                     </Text>
                   </View>
                 )}
 
                 {selectedProgram.auditorRemarks && (
-                  <View style={styles.auditorBox}>
-                    <Text style={styles.auditorBoxTitle}>Auditor Sign-off & Remarks</Text>
-                    <Text style={styles.auditorRemarksText}>{selectedProgram.auditorRemarks}</Text>
+                  <View className={styles.auditorBox}>
+                    <Text className={styles.auditorBoxTitle}>Auditor Sign-off & Remarks</Text>
+                    <Text className={styles.auditorRemarksText}>{selectedProgram.auditorRemarks}</Text>
                     {selectedProgram.auditScore ? (
-                      <Text style={styles.scoreBadge}>Score: {selectedProgram.auditScore}/100</Text>
+                      <Text className={styles.scoreBadge}>Score: {selectedProgram.auditScore}/100</Text>
                     ) : null}
                   </View>
                 )}
               </ScrollView>
 
-              <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedProgram(null)}>
-                <Text style={styles.closeBtnText}>Close Details</Text>
+              <TouchableOpacity className={styles.closeBtn} onPress={() => setSelectedProgram(null)}>
+                <View className="flex-row items-center justify-center gap-1.5">
+                  <X size={15} color={Colors.textSecondary} />
+                  <Text className={styles.closeBtnText}>Close Details</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -552,44 +898,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
       {/* Auditor Assignment Modal */}
       {approvingProgram && (
         <Modal visible transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Approve Team & Assign Auditor</Text>
-              <Text style={styles.modalSub}>{approvingProgram.programName}</Text>
-              <Text style={styles.auditorSelectLabel}>Select Program Auditor:</Text>
-              <View style={styles.auditorList}>
+          <View className={styles.modalOverlay}>
+            <View className={styles.modalCard}>
+              <Text className={styles.modalTitle}>Approve Team & Assign Auditor</Text>
+              <Text className={styles.modalSub}>{approvingProgram.programName}</Text>
+              <Text className={styles.auditorSelectLabel}>Select Program Auditor:</Text>
+              <View className={styles.auditorList}>
                 {auditors.map(aud => (
                   <TouchableOpacity
                     key={aud.id}
-                    style={[
-                      styles.auditorItem,
-                      selectedAuditorId === aud.id && styles.auditorItemActive,
-                    ]}
+                    className={`${styles.auditorItem} ${selectedAuditorId === aud.id ? styles.auditorItemActive : ''}`}
                     onPress={() => setSelectedAuditorId(aud.id)}
                   >
-                    <Text
-                      style={[
-                        styles.auditorItemText,
-                        selectedAuditorId === aud.id && styles.auditorItemTextActive,
-                      ]}
-                    >
+                    <Text className={`${styles.auditorItemText} ${selectedAuditorId === aud.id ? styles.auditorItemTextActive : ''}`}>
                       {aud.fullName}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <View style={styles.modalBtnRow}>
+              <View className={styles.modalBtnRow}>
                 <TouchableOpacity
-                  style={styles.cancelModalBtn}
+                  className={styles.cancelModalBtn}
                   onPress={() => setApprovingProgram(null)}
                 >
-                  <Text style={styles.cancelModalBtnText}>Cancel</Text>
+                  <Text className={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.confirmModalBtn}
+                  className={styles.confirmModalBtn}
                   onPress={handleConfirmTeamApproval}
                 >
-                  <Text style={styles.confirmModalBtnText}>Start Program</Text>
+                  <View className="flex-row items-center justify-center gap-1.5">
+                    <ClipboardCheck size={15} color={Colors.white} />
+                    <Text className={styles.confirmModalBtnText}>Start Program</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -600,13 +941,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
       {/* Add / Edit Employee Modal */}
       {isEmpModalOpen && (
         <Modal visible transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>
+          <View className={styles.modalOverlay}>
+            <View className={styles.modalCard}>
+              <Text className={styles.modalTitle}>
                 {editingEmp ? 'Edit Employee Role' : 'Add New Employee'}
               </Text>
               <TextInput
-                style={styles.modalInput}
+                className={styles.modalInput}
                 placeholder="Full Name"
                 placeholderTextColor={Colors.textMuted}
                 value={empFullName}
@@ -614,7 +955,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                 editable={!editingEmp}
               />
               <TextInput
-                style={styles.modalInput}
+                className={styles.modalInput}
                 placeholder="Work Email"
                 placeholderTextColor={Colors.textMuted}
                 value={empEmail}
@@ -622,48 +963,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                 editable={!editingEmp}
               />
               <TextInput
-                style={styles.modalInput}
+                className={styles.modalInput}
                 placeholder="Phone / WhatsApp"
                 placeholderTextColor={Colors.textMuted}
                 value={empPhone}
                 onChangeText={setEmpPhone}
               />
               <TextInput
-                style={styles.modalInput}
+                className={styles.modalInput}
                 placeholder="Employee Code"
                 placeholderTextColor={Colors.textMuted}
                 value={empCode}
                 onChangeText={setEmpCode}
                 editable={!editingEmp}
               />
-              <Text style={styles.auditorSelectLabel}>Select Role:</Text>
-              <View style={styles.rolePickerRow}>
+              <Text className={styles.auditorSelectLabel}>Select Role:</Text>
+              <View className={styles.rolePickerRow}>
                 {(['employee', 'program_controller', 'program_auditor', 'admin'] as UserRole[]).map(r => (
                   <TouchableOpacity
                     key={r}
-                    style={[styles.rolePickBtn, empRole === r && styles.rolePickBtnActive]}
+                    className={`${styles.rolePickBtn} ${empRole === r ? styles.rolePickBtnActive : ''}`}
                     onPress={() => setEmpRole(r)}
                   >
                     <Text
-                      style={[
-                        styles.rolePickBtnText,
-                        empRole === r && styles.rolePickBtnTextActive,
-                      ]}
+                      className={`${styles.rolePickBtnText} ${empRole === r ? styles.rolePickBtnTextActive : ''}`}
                     >
                       {r.replace('_', ' ')}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <View style={styles.modalBtnRow}>
+              <View className={styles.modalBtnRow}>
                 <TouchableOpacity
-                  style={styles.cancelModalBtn}
+                  className={styles.cancelModalBtn}
                   onPress={() => setIsEmpModalOpen(false)}
                 >
-                  <Text style={styles.cancelModalBtnText}>Cancel</Text>
+                  <Text className={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmModalBtn} onPress={handleSaveEmployee}>
-                  <Text style={styles.confirmModalBtnText}>Save</Text>
+                <TouchableOpacity className={styles.confirmModalBtn} onPress={handleSaveEmployee}>
+                  <View className="flex-row items-center justify-center gap-1.5">
+                    <Save size={15} color={Colors.white} />
+                    <Text className={styles.confirmModalBtnText}>Save</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -674,548 +1015,143 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  navTabs: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  tabsScroll: {
-    paddingHorizontal: 12,
-    gap: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  tabItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  activeTabItem: {
-    backgroundColor: Colors.primary,
-  },
-  tabItemText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  activeTabItemText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  refreshBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-  },
-  refreshBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  searchBar: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    marginBottom: 8,
-  },
-  content: {
-    padding: 16,
-    maxWidth: 900,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  tabSection: {
-    gap: 16,
-  },
-  sectionHeading: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  subHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  metricCard: {
-    flex: 1,
-    minWidth: 140,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderLeftWidth: 4,
-  },
-  metricLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  metricValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  recentSection: {
-    marginTop: 8,
-  },
-  programCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 10,
-    gap: 4,
-  },
-  progHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  progLocation: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  progMeta: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
-  activeTag: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  activeTagText: {
-    color: '#166534',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  completedTag: {
-    backgroundColor: '#E0F2FE',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  completedTagText: {
-    color: '#0369A1',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  scoreText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginTop: 4,
-  },
-  remarksSnippet: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 6,
-    padding: 8,
-    marginTop: 6,
-  },
-  remarksText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    color: Colors.textSecondary,
-  },
-  progDetailBox: {
-    backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 8,
-    gap: 4,
-  },
-  progDetailText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  bold: {
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  emptyBox: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  addButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  employeeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 8,
-  },
-  empHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  empName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  empEmail: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  empCode: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textMuted,
-  },
-  empPhone: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  empBadgeGroup: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  roleBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  statusBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  empActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  editBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#F1F5F9',
-  },
-  editBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  deleteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#FEE2E2',
-  },
-  deleteBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  approvalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 8,
-    gap: 4,
-  },
-  approvalTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  approveTeamBtn: {
-    backgroundColor: Colors.secondary,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  approveTeamBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  approvalBtnRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  approveUserBtn: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  approveUserBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  rejectUserBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-  },
-  rejectUserBtnText: {
-    color: '#DC2626',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '85%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  modalSub: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 16,
-  },
-  modalBody: {
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textMuted,
-  },
-  detailValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  metricsBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-    gap: 4,
-  },
-  metricsBoxTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  metricLine: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  auditorBox: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    gap: 4,
-  },
-  auditorBoxTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#15803D',
-  },
-  auditorRemarksText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    color: '#166534',
-  },
-  scoreBadge: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#15803D',
-    marginTop: 4,
-  },
-  closeBtn: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  closeBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  auditorSelectLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  auditorList: {
-    gap: 6,
-    marginBottom: 16,
-  },
-  auditorItem: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#F8FAFC',
-  },
-  auditorItemActive: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
-  },
-  auditorItemText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  auditorItemTextActive: {
-    color: '#FFFFFF',
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  cancelModalBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  cancelModalBtnText: {
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  confirmModalBtn: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  confirmModalBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    marginBottom: 10,
-  },
-  rolePickerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 16,
-  },
-  rolePickBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#F8FAFC',
-  },
-  rolePickBtnActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  rolePickBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'capitalize',
-  },
-  rolePickBtnTextActive: {
-    color: '#FFFFFF',
-  },
-});
+const styles = {
+  container: 'flex-1 bg-marush-background',
+  navTabs: 'border-b border-marush-border bg-white',
+  navInner: 'mx-auto w-full max-w-[1280px] flex-row items-center px-4 md:px-8',
+  tabsScroll: 'flex-grow items-center gap-[18px] py-0',
+  tabItem: 'border-b-2 border-transparent px-1 py-[15px]',
+  activeTabItem: 'border-marush-primary',
+  tabItemText: 'text-[13px] font-semibold text-marush-muted',
+  activeTabItemText: 'font-bold text-marush-primary',
+  refreshBtn: 'ml-3 justify-center rounded-lg border border-marush-border bg-white px-3 py-2',
+  refreshBtnText: 'text-xs font-semibold text-marush-primary',
+  searchBar: 'mb-2 rounded-lg border border-marush-border bg-white px-3 py-2 text-[13px]',
+  content: 'mx-auto w-full max-w-[1280px] p-4 md:p-8',
+  tabSection: 'gap-4',
+  pageHeader: 'flex-row flex-wrap items-start justify-between gap-4',
+  pageHeaderCopy: 'min-w-0 flex-1',
+  eyebrow: 'mb-1 text-[10px] font-bold tracking-[1.5px] text-marush-secondary-dark',
+  sectionHeading: 'text-xl font-bold text-marush-text',
+  sectionDescription: 'mt-1 max-w-[620px] text-[13px] leading-5 text-marush-muted',
+  statusPill: 'flex-row items-center gap-1.5 rounded-full border border-marush-border bg-white px-3 py-2',
+  statusPillText: 'text-[11px] font-semibold text-marush-primary',
+  subHeading: 'mb-2 text-sm font-bold text-marush-text',
+  metricsGrid: 'mt-2 flex-row flex-wrap gap-3',
+  metricCard: 'min-w-[190px] flex-1 rounded-xl border border-l-4 border-marush-border bg-white p-4 shadow-sm',
+  metricCardHeader: 'flex-row items-center justify-between gap-2',
+  metricTrend: 'text-[10px] font-bold uppercase tracking-wide text-marush-muted-light',
+  metricLabel: 'text-[11px] font-bold uppercase text-marush-muted-light',
+  metricValue: 'mt-3 text-[28px] font-extrabold',
+  metricSupporting: 'mt-0.5 text-[12px] text-marush-muted',
+  recentSection: 'mt-4 rounded-xl border border-marush-border bg-white p-4 md:p-5',
+  sectionCaption: 'text-[12px] text-marush-muted',
+  countCaption: 'rounded-full bg-marush-subtle px-2.5 py-1 text-[11px] font-semibold text-marush-primary',
+  requestSummary: 'flex-row items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4',
+  requestSummaryIcon: 'rounded-lg bg-white p-2.5',
+  requestSummaryTitle: 'text-[13px] font-bold text-marush-text',
+  requestSummaryText: 'mt-0.5 text-[12px] text-marush-muted',
+  compactEmptyState: 'items-center rounded-xl border border-dashed border-marush-border bg-white p-6',
+  requestCardHeader: 'flex-row flex-wrap items-start justify-between gap-3',
+  requestDetails: 'mt-3 flex-row flex-wrap gap-8 border-t border-marush-border pt-3',
+  requestDetailLabel: 'text-[10px] font-bold uppercase tracking-wide text-marush-muted-light',
+  requestDetailValue: 'mt-1 text-[12px] font-semibold capitalize text-marush-text',
+  directorySummary: 'flex-row items-center rounded-xl border border-marush-border bg-white p-4 shadow-sm',
+  directorySummaryItem: 'min-w-0 flex-1 items-center',
+  directorySummaryValue: 'text-lg font-extrabold text-marush-text',
+  directorySummaryLabel: 'mt-0.5 text-[11px] font-medium text-marush-muted',
+  directorySummaryDivider: 'h-8 w-px bg-marush-border',
+  directoryToolbar: 'gap-3 rounded-xl border border-marush-border bg-white p-3 shadow-sm md:flex-row md:items-center',
+  searchWrapper: 'flex-row items-center gap-2 rounded-lg border border-marush-border bg-marush-subtle/50 px-3',
+  searchInput: 'min-w-0 flex-1 py-2.5 text-[13px] text-marush-text',
+  filterScroll: 'gap-2',
+  filterChip: 'rounded-full border border-marush-border bg-white px-3 py-2',
+  filterChipActive: 'border-marush-primary bg-marush-primary',
+  filterChipText: 'text-[11px] font-semibold text-marush-muted',
+  filterChipTextActive: 'text-white',
+  directoryEmptyState: 'items-center rounded-xl border border-dashed border-marush-border bg-white p-10',
+  programCard: 'mb-2.5 gap-1 rounded-xl border border-marush-border bg-white p-4',
+  progHeaderRow: 'flex-row flex-wrap items-start justify-between gap-2',
+  progTitle: 'min-w-0 flex-1 text-[15px] font-bold text-marush-text',
+  progLocation: 'text-[13px] font-medium text-marush-muted',
+  progMeta: 'mt-1 text-xs text-marush-muted-light',
+  activeTag: 'rounded-md bg-marush-subtle px-2 py-1',
+  activeTagText: 'text-[10px] font-extrabold text-marush-primary-dark',
+  completedTag: 'rounded-md bg-marush-subtle px-2 py-1',
+  completedTagText: 'text-[10px] font-extrabold text-marush-primary',
+  scoreText: 'mt-1 text-xs font-bold text-marush-primary',
+  remarksSnippet: 'mt-1.5 rounded-md bg-marush-subtle p-2',
+  remarksText: 'text-xs italic text-marush-muted',
+  progDetailBox: 'mt-2 gap-1 rounded-lg bg-marush-subtle p-2.5',
+  progDetailText: 'text-xs text-marush-muted',
+  bold: 'font-bold text-marush-text',
+  emptyBox: 'items-center rounded-lg bg-marush-subtle/50 p-8',
+  emptyTitle: 'text-[13px] font-bold text-marush-text',
+  emptyText: 'mt-1 max-w-[360px] text-center text-[13px] text-marush-muted-light',
+  sectionHeaderRow: 'flex-row flex-wrap items-center justify-between gap-3',
+  addButton: 'rounded-lg bg-marush-primary px-3 py-1.5',
+  addButtonText: 'text-xs font-bold text-white',
+  employeeCard: 'mb-2 rounded-xl border border-marush-border bg-white p-4',
+  empHeader: 'flex-row flex-wrap items-start justify-between gap-3',
+  employeeIdentity: 'min-w-0 flex-1 flex-row items-center gap-3',
+  employeeAvatar: 'h-10 w-10 items-center justify-center rounded-full bg-marush-primary-subtle',
+  employeeAvatarText: 'text-sm font-extrabold text-marush-primary',
+  employeeDetails: 'mt-3 flex-row flex-wrap gap-3 border-t border-marush-border pt-3',
+  empName: 'text-sm font-bold text-marush-text',
+  empEmail: 'text-xs text-marush-muted',
+  empCode: 'text-[10px] font-bold text-marush-muted-light',
+  empPhone: 'mt-0.5 text-[11px] text-marush-muted-light',
+  empBadgeGroup: 'items-end gap-1',
+  roleBadge: 'rounded-md px-2 py-0.5',
+  roleBadgeText: 'text-[9px] font-bold text-white',
+  statusBadge: 'rounded-md bg-marush-subtle px-2 py-0.5',
+  statusBadgeText: 'text-[9px] font-bold',
+  empActionRow: 'mt-2.5 flex-row justify-end gap-2 border-t border-marush-border pt-2',
+  editBtn: 'rounded-md bg-marush-subtle px-2.5 py-1',
+  editBtnText: 'text-[11px] font-semibold text-marush-muted',
+  deleteBtn: 'rounded-md bg-marush-subtle px-2.5 py-1',
+  deleteBtnText: 'text-[11px] font-semibold text-marush-primary-dark',
+  approvalCard: 'mb-2 gap-1 rounded-xl border border-marush-border bg-white p-4',
+  approvalTitle: 'text-sm font-bold text-marush-text',
+  approveTeamBtn: 'mt-2 items-center rounded-lg bg-marush-secondary py-2',
+  approveTeamBtnText: 'text-[13px] font-bold text-white',
+  approvalBtnRow: 'mt-2 flex-row flex-wrap gap-2',
+  approveUserBtn: 'min-w-[140px] flex-1 items-center rounded-lg bg-marush-primary py-2',
+  approveUserBtnText: 'text-xs font-bold text-white',
+  rejectUserBtn: 'min-w-[96px] flex-1 items-center rounded-lg bg-marush-subtle px-3.5 py-2',
+  rejectUserBtnText: 'text-xs font-bold text-marush-primary-dark',
+  modalOverlay: 'flex-1 items-center justify-center bg-black/50 p-4',
+  modalCard: 'max-h-[85%] w-full max-w-[480px] rounded-2xl bg-white p-6',
+  modalTitle: 'text-lg font-extrabold text-marush-primary',
+  modalSub: 'mb-4 text-[13px] text-marush-muted',
+  modalBody: 'mb-4',
+  detailRow: 'flex-row flex-wrap justify-between gap-x-2 gap-y-1 border-b border-marush-border py-1.5',
+  detailLabel: 'text-xs font-bold text-marush-muted-light',
+  detailValue: 'text-xs font-semibold text-marush-text',
+  metricsBox: 'mt-3 gap-1 rounded-lg bg-marush-subtle p-3',
+  metricsBoxTitle: 'mb-1 text-xs font-bold text-marush-primary',
+  metricLine: 'text-[11px] text-marush-muted',
+  auditorBox: 'mt-3 gap-1 rounded-lg border border-marush-border bg-marush-subtle p-3',
+  auditorBoxTitle: 'text-xs font-bold text-marush-primary',
+  auditorRemarksText: 'text-xs italic text-marush-primary-dark',
+  scoreBadge: 'mt-1 text-[11px] font-extrabold text-marush-primary',
+  closeBtn: 'items-center rounded-lg bg-marush-primary py-2.5',
+  closeBtnText: 'text-[13px] font-bold text-white',
+  auditorSelectLabel: 'mb-2 text-xs font-bold text-marush-text',
+  auditorList: 'mb-4 gap-1.5',
+  auditorItem: 'rounded-lg border border-marush-border bg-marush-subtle p-2.5',
+  auditorItemActive: 'border-marush-secondary bg-marush-secondary',
+  auditorItemText: 'text-[13px] font-semibold text-marush-text',
+  auditorItemTextActive: 'text-white',
+  modalBtnRow: 'flex-row flex-wrap justify-end gap-2',
+  cancelModalBtn: 'rounded-lg px-3.5 py-2',
+  cancelModalBtnText: 'font-semibold text-marush-muted',
+  confirmModalBtn: 'rounded-lg bg-marush-primary px-4 py-2',
+  confirmModalBtnText: 'font-bold text-white',
+  modalInput: 'mb-2.5 rounded-lg border border-marush-border px-3 py-2 text-[13px]',
+  rolePickerRow: 'mb-4 flex-row flex-wrap gap-1.5',
+  rolePickBtn: 'rounded-md border border-marush-border bg-marush-subtle px-2.5 py-1.5',
+  rolePickBtnActive: 'border-marush-primary bg-marush-primary',
+  rolePickBtnText: 'text-[11px] font-semibold capitalize text-marush-muted',
+  rolePickBtnTextActive: 'text-white',
+};

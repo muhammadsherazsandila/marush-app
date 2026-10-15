@@ -1,0 +1,8 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "/^superplan run --json$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}
