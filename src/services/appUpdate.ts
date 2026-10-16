@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
+import appConfig from "../../app.json";
 
-const CURRENT_VERSION = "1.0.0";
 const RELEASES_API_URL =
   "https://api.github.com/repos/muhammadsherazsandila/marush-app/releases/latest";
 
@@ -42,6 +42,7 @@ const isNewerVersion = (candidate: string, current: string) => {
 
 export const checkForAppUpdate = async (): Promise<AppUpdate | null> => {
   if (Platform.OS !== "android") return null;
+  const currentVersion = appConfig.expo.version;
 
   const response = await fetch(RELEASES_API_URL, {
     headers: { Accept: "application/vnd.github+json" },
@@ -55,7 +56,7 @@ export const checkForAppUpdate = async (): Promise<AppUpdate | null> => {
   const version = release.tag_name.replace(/^android-v/i, "").replace(/^v/i, "");
   const apk = release.assets?.find((asset) => asset.name.endsWith(".apk"));
 
-  if (!apk || !isNewerVersion(version, CURRENT_VERSION)) return null;
+  if (!apk || !isNewerVersion(version, currentVersion)) return null;
 
   return {
     version,
