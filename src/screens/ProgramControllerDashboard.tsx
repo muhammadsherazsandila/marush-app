@@ -33,11 +33,40 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   // Form State for Program Initiation
   const [programName, setProgramName] = useState('');
   const [hatcheryOrFarm, setHatcheryOrFarm] = useState('');
+  const [farmAddress, setFarmAddress] = useState('');
+  const [farmManagerName, setFarmManagerName] = useState('');
+  
+  // Bird counts categorized as B, L, Br
+  const [birdBreeder, setBirdBreeder] = useState('');
+  const [birdLayer, setBirdLayer] = useState('');
+  const [birdBroiler, setBirdBroiler] = useState('');
   const [flockSize, setFlockSize] = useState('');
+
+  // Vaccines
+  const [vaccinesUsed, setVaccinesUsed] = useState('Vectormune ND + Cevac Transmune');
+
+  // Dates & Times
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('08:00 AM');
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [endTime, setEndTime] = useState('04:00 PM');
+
+  // Travel schedule
+  const [travelDepartureTime, setTravelDepartureTime] = useState('06:30 AM');
+  const [travelArrivalTime, setTravelArrivalTime] = useState('07:45 AM');
+
+  // Vaccination schedule
+  const [vaccinationStartedAtTime, setVaccinationStartedAtTime] = useState('08:15 AM');
+  const [vaccinationCompletedAtTime, setVaccinationCompletedAtTime] = useState('03:45 PM');
+
+  // Return schedule
+  const [returnDepartureTime, setReturnDepartureTime] = useState('04:15 PM');
+  const [returnArrivalTime, setReturnArrivalTime] = useState('05:30 PM');
+
+  // Controller Remarks
+  const [controllerRemarks, setControllerRemarks] = useState('');
+
+  // Team Details
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
 
   // End Program / Send to Auditor Modal
@@ -90,21 +119,27 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   };
 
   const handleInitiateProgram = async () => {
-    if (!programName.trim() || !hatcheryOrFarm.trim() || !flockSize.trim()) {
+    if (!programName.trim() || !hatcheryOrFarm.trim()) {
       Toast.show({
         type: 'error',
         text1: 'Required Fields Missing',
-        text2: 'Please provide program name, hatchery/farm, and flock size.',
+        text2: 'Please provide program title and hatchery/farm name.',
       });
       return;
     }
 
-    const parsedFlock = parseInt(flockSize.trim(), 10);
-    if (isNaN(parsedFlock) || parsedFlock <= 0) {
+    const bCount = parseInt(birdBreeder.trim(), 10) || 0;
+    const lCount = parseInt(birdLayer.trim(), 10) || 0;
+    const brCount = parseInt(birdBroiler.trim(), 10) || 0;
+    const categoryTotal = bCount + lCount + brCount;
+    const manualFlock = parseInt(flockSize.trim(), 10) || 0;
+    const finalFlockSize = categoryTotal > 0 ? categoryTotal : manualFlock;
+
+    if (finalFlockSize <= 0) {
       Toast.show({
         type: 'error',
-        text1: 'Invalid Flock Size',
-        text2: 'Please enter a valid positive number for flock size.',
+        text1: 'Bird Count Required',
+        text2: 'Please enter bird numbers (B, L, or Br) or total flock size.',
       });
       return;
     }
@@ -113,35 +148,62 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
       Toast.show({
         type: 'error',
         text1: 'No Team Selected',
-        text2: 'Select at least one available employee for the team.',
+        text2: 'Select at least one vaccinator / team member.',
       });
       return;
     }
+
+    const vaccinesArray = vaccinesUsed
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean);
 
     setSubmitting(true);
     try {
       const newProg = await dataProvider.createProgram({
         programName: programName.trim(),
         hatcheryOrFarmName: hatcheryOrFarm.trim(),
-        flockSize: parsedFlock,
+        farmAddress: farmAddress.trim() || undefined,
+        farmManagerName: farmManagerName.trim() || undefined,
+        flockSize: finalFlockSize,
+        birdDetails: {
+          b: bCount || undefined,
+          l: lCount || undefined,
+          br: brCount || undefined,
+          total: finalFlockSize,
+        },
+        vaccinesUsed: vaccinesArray.length > 0 ? vaccinesArray : ['Vectormune ND + Cevac Transmune'],
         scheduledStartDate: startDate,
         scheduledStartTime: startTime,
         scheduledEndDate: endDate,
         scheduledEndTime: endTime,
+        travelDepartureTime: travelDepartureTime.trim() || undefined,
+        travelArrivalTime: travelArrivalTime.trim() || undefined,
+        returnDepartureTime: returnDepartureTime.trim() || undefined,
+        returnArrivalTime: returnArrivalTime.trim() || undefined,
+        vaccinationStartedAt: vaccinationStartedAtTime ? `${startDate}T${vaccinationStartedAtTime}` : undefined,
+        vaccinationCompletedAt: vaccinationCompletedAtTime ? `${endDate}T${vaccinationCompletedAtTime}` : undefined,
+        controllerRemarks: controllerRemarks.trim() || undefined,
         controllerId: currentUser.id,
         teamMemberIds: selectedEmpIds,
       });
 
       Toast.show({
         type: 'success',
-        text1: 'Team Submitted to Admin',
+        text1: 'Program Submitted to Admin',
         text2: `${newProg.programName} sent for admin review and auditor assignment.`,
       });
 
       // Reset Form
       setProgramName('');
       setHatcheryOrFarm('');
+      setFarmAddress('');
+      setFarmManagerName('');
+      setBirdBreeder('');
+      setBirdLayer('');
+      setBirdBroiler('');
       setFlockSize('');
+      setControllerRemarks('');
       setSelectedEmpIds([]);
       setActiveTab('my_programs');
       refreshData();
@@ -339,121 +401,348 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
           </View>
         ) : (
           <View className={styles.formCard}>
-            <Text className={styles.formTitle}>Initiate Field Program & Draft Team</Text>
+            <Text className={styles.formTitle}>Initiate Program & Field Schedule</Text>
             <Text className={styles.formSub}>
-              Select available personnel who are not engaged in any other active concurrent programs.
+              Fill in farm, bird, vaccine, and travel details. The creator, submission timestamp, and status are automatically recorded.
             </Text>
 
-            <View className={styles.inputGroup}>
-              <Text className={styles.label}>Program Title</Text>
-              <TextInput
-                className={styles.input}
-                placeholder="e.g. Hatchery Ceva ND In-Ovo Vaccination"
-                placeholderTextColor={Colors.textMuted}
-                value={programName}
-                onChangeText={setProgramName}
-              />
-            </View>
-
-            <View className={styles.inputGroup}>
-              <Text className={styles.label}>Hatchery / Farm Location</Text>
-              <TextInput
-                className={styles.input}
-                placeholder="e.g. Big Bird Hatcheries - Unit 4, Raiwind"
-                placeholderTextColor={Colors.textMuted}
-                value={hatcheryOrFarm}
-                onChangeText={setHatcheryOrFarm}
-              />
-            </View>
-
-            <View className={styles.inputGroup}>
-              <Text className={styles.label}>Flock Size (Birds)</Text>
-              <TextInput
-                className={styles.input}
-                placeholder="e.g. 50000"
-                placeholderTextColor={Colors.textMuted}
-                value={flockSize}
-                onChangeText={setFlockSize}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View className={styles.row}>
-              <View className={`${styles.inputGroup} flex-1`}>
-                <Text className={styles.label}>Start Date</Text>
+            {/* SECTION 1: Farm Details */}
+            <View className="mb-2 mt-1 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                1. Farm Details
+              </Text>
+              
+              <View className={styles.inputGroup}>
+                <Text className={styles.label}>Program Title *</Text>
                 <TextInput
                   className={styles.input}
-                  value={startDate}
-                  onChangeText={setStartDate}
+                  placeholder="e.g. Broiler ND & IBD Complete Immunization"
+                  placeholderTextColor={Colors.textMuted}
+                  value={programName}
+                  onChangeText={setProgramName}
                 />
               </View>
-              <View className={`${styles.inputGroup} flex-1`}>
-                <Text className={styles.label}>Start Time</Text>
-                <TextInput
-                  className={styles.input}
-                  value={startTime}
-                  onChangeText={setStartTime}
-                />
-              </View>
-            </View>
 
-            <View className={styles.row}>
-              <View className={`${styles.inputGroup} flex-1`}>
-                <Text className={styles.label}>End Date</Text>
+              <View className={`${styles.inputGroup} mt-2`}>
+                <Text className={styles.label}>Farm / Hatchery Name *</Text>
                 <TextInput
                   className={styles.input}
-                  value={endDate}
-                  onChangeText={setEndDate}
+                  placeholder="e.g. Jadeed Poultry Farm Sector 4"
+                  placeholderTextColor={Colors.textMuted}
+                  value={hatcheryOrFarm}
+                  onChangeText={setHatcheryOrFarm}
                 />
               </View>
-              <View className={`${styles.inputGroup} flex-1`}>
-                <Text className={styles.label}>End Time</Text>
+
+              <View className={`${styles.inputGroup} mt-2`}>
+                <Text className={styles.label}>Farm / Hatchery Address</Text>
                 <TextInput
                   className={styles.input}
-                  value={endTime}
-                  onChangeText={setEndTime}
+                  placeholder="e.g. 12-Km Depalpur Road, Okara"
+                  placeholderTextColor={Colors.textMuted}
+                  value={farmAddress}
+                  onChangeText={setFarmAddress}
+                />
+              </View>
+
+              <View className={`${styles.inputGroup} mt-2`}>
+                <Text className={styles.label}>Owner / Farm / Hatchery Manager Name</Text>
+                <TextInput
+                  className={styles.input}
+                  placeholder="e.g. Ch. Muhammad Akram"
+                  placeholderTextColor={Colors.textMuted}
+                  value={farmManagerName}
+                  onChangeText={setFarmManagerName}
                 />
               </View>
             </View>
 
-            {/* Dynamic Available Employees Selector */}
-            <View className={styles.inputGroup}>
-              <View className={styles.empSelectHeader}>
-                <Text className={styles.label}>Select Available Team Members</Text>
+            {/* SECTION 2: Team Details */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-xs font-black uppercase tracking-wider text-marush-primary">
+                  2. Team Details
+                </Text>
                 <Text className={styles.availCount}>
                   {availableEmployees.length} Available Staff
                 </Text>
               </View>
 
-              {availableEmployees.length === 0 ? (
-                <View className={styles.noEmpBox}>
-                  <Text className={styles.noEmpWarning}>
-                    All employees are currently occupied in active programs!
-                  </Text>
+              <View className="mb-2 rounded-lg bg-white p-2.5 border border-marush-border">
+                <Text className="text-[11px] font-bold text-marush-muted">Program Controller Name</Text>
+                <Text className="text-xs font-extrabold text-marush-primary">
+                  {currentUser.fullName} ({currentUser.employeeCode || 'Lead Controller'})
+                </Text>
+              </View>
+
+              <View className={styles.inputGroup}>
+                <Text className={styles.label}>Vaccinator Name(s) * (Tap to assign)</Text>
+                {availableEmployees.length === 0 ? (
+                  <View className={styles.noEmpBox}>
+                    <Text className={styles.noEmpWarning}>
+                      All field vaccinators are currently engaged in active programs.
+                    </Text>
+                  </View>
+                ) : (
+                  <View className={styles.empListGrid}>
+                    {availableEmployees.map(emp => {
+                      const isSelected = selectedEmpIds.includes(emp.id);
+                      return (
+                        <TouchableOpacity
+                          key={emp.id}
+                          className={`${styles.empPill} ${isSelected ? styles.empPillSelected : ''}`}
+                          onPress={() => toggleSelectEmployee(emp.id)}
+                        >
+                          <View className="flex-row items-center gap-1.5">
+                            {isSelected ? <Check size={14} color={Colors.primary} /> : <Plus size={14} color={Colors.textSecondary} />}
+                            <Text className={`${styles.empPillText} ${isSelected ? styles.empPillTextSelected : ''}`}>
+                              {emp.fullName} ({emp.employeeCode || 'Vaccinator'})
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* SECTION 3: Program Details */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                3. Program Details
+              </Text>
+              
+              <View className={styles.row}>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Date of Vaccination *</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={startDate}
+                    onChangeText={setStartDate}
+                    placeholder="YYYY-MM-DD"
+                  />
                 </View>
-              ) : (
-                <View className={styles.empListGrid}>
-                  {availableEmployees.map(emp => {
-                    const isSelected = selectedEmpIds.includes(emp.id);
-                    return (
-                      <TouchableOpacity
-                        key={emp.id}
-                        className={`${styles.empPill} ${isSelected ? styles.empPillSelected : ''}`}
-                        onPress={() => toggleSelectEmployee(emp.id)}
-                      >
-                        <View className="flex-row items-center gap-1.5">
-                          {isSelected ? <Check size={14} color={Colors.primary} /> : <Plus size={14} color={Colors.textSecondary} />}
-                          <Text
-                            className={`${styles.empPillText} ${isSelected ? styles.empPillTextSelected : ''}`}
-                          >
-                            {emp.fullName} ({emp.employeeCode || emp.role})
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Time of Vaccination *</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={startTime}
+                    onChangeText={setStartTime}
+                    placeholder="08:00 AM"
+                  />
                 </View>
-              )}
+              </View>
+
+              <View className={`${styles.row} mt-2`}>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Estimated End Date</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={endDate}
+                    onChangeText={setEndDate}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Estimated End Time</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={endTime}
+                    onChangeText={setEndTime}
+                    placeholder="04:00 PM"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* SECTION 4: Bird Details */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                4. Bird Details (Number of Birds Categorized)
+              </Text>
+              
+              <View className={styles.row}>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Breeder (B)</Text>
+                  <TextInput
+                    className={styles.input}
+                    placeholder="e.g. 5000"
+                    placeholderTextColor={Colors.textMuted}
+                    value={birdBreeder}
+                    onChangeText={setBirdBreeder}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Layer (L)</Text>
+                  <TextInput
+                    className={styles.input}
+                    placeholder="e.g. 15000"
+                    placeholderTextColor={Colors.textMuted}
+                    value={birdLayer}
+                    onChangeText={setBirdLayer}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Broiler (Br)</Text>
+                  <TextInput
+                    className={styles.input}
+                    placeholder="e.g. 30000"
+                    placeholderTextColor={Colors.textMuted}
+                    value={birdBroiler}
+                    onChangeText={setBirdBroiler}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View className={`${styles.inputGroup} mt-2`}>
+                <Text className={styles.label}>Total Flock Size (Birds) *</Text>
+                <TextInput
+                  className={styles.input}
+                  placeholder={
+                    (parseInt(birdBreeder || '0', 10) + parseInt(birdLayer || '0', 10) + parseInt(birdBroiler || '0', 10)) > 0
+                      ? `Auto: ${(parseInt(birdBreeder || '0', 10) + parseInt(birdLayer || '0', 10) + parseInt(birdBroiler || '0', 10)).toLocaleString()} birds`
+                      : "e.g. 50000"
+                  }
+                  placeholderTextColor={Colors.textMuted}
+                  value={flockSize}
+                  onChangeText={setFlockSize}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* SECTION 5: Vaccine Details */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                5. Vaccine Details
+              </Text>
+              
+              <View className={styles.inputGroup}>
+                <Text className={styles.label}>Vaccine(s) Used * (comma-separated if multiple)</Text>
+                <TextInput
+                  className={styles.input}
+                  placeholder="e.g. Vectormune ND, Cevac Transmune, Cevac IBird"
+                  placeholderTextColor={Colors.textMuted}
+                  value={vaccinesUsed}
+                  onChangeText={setVaccinesUsed}
+                />
+              </View>
+            </View>
+
+            {/* SECTION 6: Travel Schedule */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                6. Travel Schedule
+              </Text>
+              
+              <View className={styles.row}>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Departure Time from Office</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={travelDepartureTime}
+                    onChangeText={setTravelDepartureTime}
+                    placeholder="06:30 AM"
+                  />
+                </View>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Arrival Time at Farm / Hatchery</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={travelArrivalTime}
+                    onChangeText={setTravelArrivalTime}
+                    placeholder="07:45 AM"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* SECTION 7: Vaccination Schedule */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                7. Vaccination Schedule
+              </Text>
+              
+              <View className={styles.row}>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Vaccination Started At</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={vaccinationStartedAtTime}
+                    onChangeText={setVaccinationStartedAtTime}
+                    placeholder="08:15 AM"
+                  />
+                </View>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Vaccination Completed At</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={vaccinationCompletedAtTime}
+                    onChangeText={setVaccinationCompletedAtTime}
+                    placeholder="03:45 PM"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* SECTION 8: Return Schedule */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                8. Return Schedule
+              </Text>
+              
+              <View className={styles.row}>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Departure Time from Farm / Hatchery</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={returnDepartureTime}
+                    onChangeText={setReturnDepartureTime}
+                    placeholder="04:15 PM"
+                  />
+                </View>
+                <View className={`${styles.inputGroup} flex-1`}>
+                  <Text className={styles.label}>Returning Time at Office</Text>
+                  <TextInput
+                    className={styles.input}
+                    value={returnArrivalTime}
+                    onChangeText={setReturnArrivalTime}
+                    placeholder="05:30 PM"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* SECTION 9: Submission & Remarks */}
+            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                9. Submission & Remarks
+              </Text>
+              
+              <View className={styles.inputGroup}>
+                <Text className={styles.label}>Controller Remarks</Text>
+                <TextInput
+                  className={`${styles.input} h-[70px]`}
+                  multiline
+                  placeholder="Record observations, site conditions, vehicle details or notes..."
+                  placeholderTextColor={Colors.textMuted}
+                  value={controllerRemarks}
+                  onChangeText={setControllerRemarks}
+                />
+              </View>
+
+              <View className="mt-3 rounded-lg border border-dashed border-marush-border bg-white p-3">
+                <Text className="text-[11px] font-bold text-marush-primary">System-Recorded Metadata</Text>
+                <Text className="mt-1 text-[11px] text-marush-muted">
+                  • Creator: {currentUser.fullName} ({currentUser.email}){'\n'}
+                  • Status: pending_approval (sent to Admin){'\n'}
+                  • Submission Timestamp: Automatic server timestamp on save
+                </Text>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -465,8 +754,8 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <View className="flex-row items-center justify-center gap-2">
-                  <ClipboardCheck size={15} color={Colors.white} />
-                  <Text className={styles.submitProgBtnText}>Submit Team to Admin for Approval</Text>
+                  <ClipboardCheck size={16} color={Colors.white} />
+                  <Text className={styles.submitProgBtnText}>Submit Program & Team to Admin</Text>
                 </View>
               )}
             </TouchableOpacity>

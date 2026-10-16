@@ -34,16 +34,35 @@ export interface ProgramCompletionMetrics {
   farmFlockObservations: string;
 }
 
+// ---- Bird Category Breakdown ----
+export interface BirdCategoryCounts {
+  b?: number; // Breeder
+  l?: number; // Layer
+  br?: number; // Broiler
+  total?: number;
+}
+
 // ---- Program ----
 export interface Program {
   id: string;
   programName: string;
   hatcheryOrFarmName: string;
+  farmAddress?: string;
+  farmManagerName?: string;
   flockSize: number;
+  birdDetails?: BirdCategoryCounts;
+  vaccinesUsed?: string[];
   scheduledStartDate: string;
   scheduledStartTime: string;
   scheduledEndDate: string;
   scheduledEndTime: string;
+  travelDepartureTime?: string;
+  travelArrivalTime?: string;
+  returnDepartureTime?: string;
+  returnArrivalTime?: string;
+  vaccinationStartedAt?: string;
+  vaccinationCompletedAt?: string;
+  controllerRemarks?: string;
   status: ProgramStatus;
   controllerId: string;
   controllerName?: string; // derived from join
@@ -56,6 +75,7 @@ export interface Program {
   auditorRemarks?: string;
   auditScore?: number;
   auditedAt?: string;
+  auditDetails?: ProgramAudit;
   createdAt: string;
   updatedAt?: string;
 }
@@ -83,6 +103,13 @@ export interface ProgramAudit {
   id: string;
   programId: string;
   auditorId: string;
+  birdCountVerified?: boolean;
+  vaccineVerified?: boolean;
+  timingVerified?: boolean;
+  vaccinationQualityAssessment?: string;
+  uniformCompliance?: boolean;
+  vaccinatorBehaviorAssessment?: string;
+  overallAuditResult?: string;
   checklist: AuditChecklistItem[];
   score?: number;
   remarks?: string;
@@ -158,11 +185,22 @@ export interface Database {
           id: string;
           program_name: string;
           hatchery_or_farm_name: string;
+          farm_address: string | null;
+          farm_manager_name: string | null;
           flock_size: number;
+          bird_details: BirdCategoryCounts | null;
+          vaccines_used: string[] | null;
           scheduled_start_date: string;
           scheduled_start_time: string;
           scheduled_end_date: string;
           scheduled_end_time: string;
+          travel_departure_time: string | null;
+          travel_arrival_time: string | null;
+          return_departure_time: string | null;
+          return_arrival_time: string | null;
+          vaccination_started_at: string | null;
+          vaccination_completed_at: string | null;
+          controller_remarks: string | null;
           status: ProgramStatus;
           controller_id: string;
           auditor_id: string | null;
@@ -178,11 +216,22 @@ export interface Database {
           id?: string;
           program_name: string;
           hatchery_or_farm_name: string;
+          farm_address?: string | null;
+          farm_manager_name?: string | null;
           flock_size: number;
+          bird_details?: BirdCategoryCounts | null;
+          vaccines_used?: string[] | null;
           scheduled_start_date: string;
           scheduled_start_time: string;
           scheduled_end_date: string;
           scheduled_end_time: string;
+          travel_departure_time?: string | null;
+          travel_arrival_time?: string | null;
+          return_departure_time?: string | null;
+          return_arrival_time?: string | null;
+          vaccination_started_at?: string | null;
+          vaccination_completed_at?: string | null;
+          controller_remarks?: string | null;
           status?: ProgramStatus;
           controller_id: string;
           auditor_id?: string | null;
@@ -195,11 +244,22 @@ export interface Database {
         Update: {
           program_name?: string;
           hatchery_or_farm_name?: string;
+          farm_address?: string | null;
+          farm_manager_name?: string | null;
           flock_size?: number;
+          bird_details?: BirdCategoryCounts | null;
+          vaccines_used?: string[] | null;
           scheduled_start_date?: string;
           scheduled_start_time?: string;
           scheduled_end_date?: string;
           scheduled_end_time?: string;
+          travel_departure_time?: string | null;
+          travel_arrival_time?: string | null;
+          return_departure_time?: string | null;
+          return_arrival_time?: string | null;
+          vaccination_started_at?: string | null;
+          vaccination_completed_at?: string | null;
+          controller_remarks?: string | null;
           status?: ProgramStatus;
           controller_id?: string;
           auditor_id?: string | null;
@@ -237,6 +297,13 @@ export interface Database {
           id: string;
           program_id: string;
           auditor_id: string;
+          bird_count_verified: boolean | null;
+          vaccine_verified: boolean | null;
+          timing_verified: boolean | null;
+          vaccination_quality_assessment: string | null;
+          uniform_compliance: boolean | null;
+          vaccinator_behavior_assessment: string | null;
+          overall_audit_result: string | null;
           checklist: AuditChecklistItem[];
           score: number | null;
           remarks: string | null;
@@ -248,12 +315,26 @@ export interface Database {
           id?: string;
           program_id: string;
           auditor_id: string;
+          bird_count_verified?: boolean | null;
+          vaccine_verified?: boolean | null;
+          timing_verified?: boolean | null;
+          vaccination_quality_assessment?: string | null;
+          uniform_compliance?: boolean | null;
+          vaccinator_behavior_assessment?: string | null;
+          overall_audit_result?: string | null;
           checklist?: AuditChecklistItem[];
           score?: number | null;
           remarks?: string | null;
           signed_off_at?: string | null;
         };
         Update: {
+          bird_count_verified?: boolean | null;
+          vaccine_verified?: boolean | null;
+          timing_verified?: boolean | null;
+          vaccination_quality_assessment?: string | null;
+          uniform_compliance?: boolean | null;
+          vaccinator_behavior_assessment?: string | null;
+          overall_audit_result?: string | null;
           checklist?: AuditChecklistItem[];
           score?: number | null;
           remarks?: string | null;

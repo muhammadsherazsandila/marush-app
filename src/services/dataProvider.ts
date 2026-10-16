@@ -235,15 +235,27 @@ function mapProfileRow(
 }
 
 function mapProgramRow(row: any): Program {
+  const auditRow = Array.isArray(row.program_audits) ? row.program_audits[0] : row.program_audits;
   return {
     id: row.id,
     programName: row.program_name,
     hatcheryOrFarmName: row.hatchery_or_farm_name,
+    farmAddress: row.farm_address || undefined,
+    farmManagerName: row.farm_manager_name || undefined,
     flockSize: row.flock_size,
+    birdDetails: row.bird_details || undefined,
+    vaccinesUsed: row.vaccines_used || undefined,
     scheduledStartDate: row.scheduled_start_date,
     scheduledStartTime: row.scheduled_start_time,
     scheduledEndDate: row.scheduled_end_date,
     scheduledEndTime: row.scheduled_end_time,
+    travelDepartureTime: row.travel_departure_time || undefined,
+    travelArrivalTime: row.travel_arrival_time || undefined,
+    returnDepartureTime: row.return_departure_time || undefined,
+    returnArrivalTime: row.return_arrival_time || undefined,
+    vaccinationStartedAt: row.vaccination_started_at || undefined,
+    vaccinationCompletedAt: row.vaccination_completed_at || undefined,
+    controllerRemarks: row.controller_remarks || undefined,
     status: row.status,
     controllerId: row.controller_id,
     controllerName: row.controller?.full_name,
@@ -258,6 +270,24 @@ function mapProgramRow(row: any): Program {
     auditorRemarks: row.auditor_remarks || undefined,
     auditScore: row.audit_score || undefined,
     auditedAt: row.audited_at || undefined,
+    auditDetails: auditRow ? {
+      id: auditRow.id,
+      programId: auditRow.program_id,
+      auditorId: auditRow.auditor_id,
+      birdCountVerified: auditRow.bird_count_verified ?? undefined,
+      vaccineVerified: auditRow.vaccine_verified ?? undefined,
+      timingVerified: auditRow.timing_verified ?? undefined,
+      vaccinationQualityAssessment: auditRow.vaccination_quality_assessment || undefined,
+      uniformCompliance: auditRow.uniform_compliance ?? undefined,
+      vaccinatorBehaviorAssessment: auditRow.vaccinator_behavior_assessment || undefined,
+      overallAuditResult: auditRow.overall_audit_result || undefined,
+      checklist: auditRow.checklist || [],
+      score: auditRow.score ?? undefined,
+      remarks: auditRow.remarks || undefined,
+      signedOffAt: auditRow.signed_off_at || undefined,
+      createdAt: auditRow.created_at,
+      updatedAt: auditRow.updated_at,
+    } : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -621,7 +651,8 @@ export const dataProvider = {
           *,
           controller:profiles!programs_controller_id_fkey(full_name),
           auditor:profiles!programs_auditor_id_fkey(full_name),
-          program_members(user_id, role_in_program, user:profiles(*))
+          program_members(user_id, role_in_program, user:profiles(*)),
+          program_audits(*)
         `,
         )
         .order("created_at", { ascending: false });
@@ -641,7 +672,8 @@ export const dataProvider = {
           *,
           controller:profiles!programs_controller_id_fkey(full_name),
           auditor:profiles!programs_auditor_id_fkey(full_name),
-          program_members(user_id, role_in_program, user:profiles(*))
+          program_members(user_id, role_in_program, user:profiles(*)),
+          program_audits(*)
         `,
         )
         .eq("id", id)
@@ -677,6 +709,17 @@ export const dataProvider = {
           p_scheduled_end_time: data.scheduledEndTime,
           p_controller_id: data.controllerId,
           p_team_member_ids: data.teamMemberIds || [],
+          p_farm_address: data.farmAddress || null,
+          p_farm_manager_name: data.farmManagerName || null,
+          p_bird_details: data.birdDetails || null,
+          p_vaccines_used: data.vaccinesUsed || [],
+          p_travel_departure_time: data.travelDepartureTime || null,
+          p_travel_arrival_time: data.travelArrivalTime || null,
+          p_return_departure_time: data.returnDepartureTime || null,
+          p_return_arrival_time: data.returnArrivalTime || null,
+          p_vaccination_started_at: data.vaccinationStartedAt || null,
+          p_vaccination_completed_at: data.vaccinationCompletedAt || null,
+          p_controller_remarks: data.controllerRemarks || null,
         },
       );
       if (error) throw new Error(error.message);
@@ -737,6 +780,15 @@ export const dataProvider = {
     remarks: string,
     score: number = 95,
     checklist?: AuditChecklistItem[],
+    auditFindings?: {
+      birdCountVerified?: boolean;
+      vaccineVerified?: boolean;
+      timingVerified?: boolean;
+      vaccinationQualityAssessment?: string;
+      uniformCompliance?: boolean;
+      vaccinatorBehaviorAssessment?: string;
+      overallAuditResult?: string;
+    },
   ): Promise<ProgramAudit | null> => {
     if (isSupabaseConfigured) {
       const { data: auditRows, error: auditError } =
@@ -746,6 +798,13 @@ export const dataProvider = {
           p_remarks: remarks,
           p_score: score,
           p_checklist: checklist || [],
+          p_bird_count_verified: auditFindings?.birdCountVerified ?? true,
+          p_vaccine_verified: auditFindings?.vaccineVerified ?? true,
+          p_timing_verified: auditFindings?.timingVerified ?? true,
+          p_vaccination_quality_assessment: auditFindings?.vaccinationQualityAssessment ?? null,
+          p_uniform_compliance: auditFindings?.uniformCompliance ?? true,
+          p_vaccinator_behavior_assessment: auditFindings?.vaccinatorBehaviorAssessment ?? null,
+          p_overall_audit_result: auditFindings?.overallAuditResult ?? "approved",
         });
       if (auditError) throw new Error(auditError.message);
       const auditRow = auditRows?.[0];
@@ -755,6 +814,13 @@ export const dataProvider = {
           id: auditRow.id,
           programId: auditRow.program_id,
           auditorId: auditRow.auditor_id,
+          birdCountVerified: auditRow.bird_count_verified ?? undefined,
+          vaccineVerified: auditRow.vaccine_verified ?? undefined,
+          timingVerified: auditRow.timing_verified ?? undefined,
+          vaccinationQualityAssessment: auditRow.vaccination_quality_assessment || undefined,
+          uniformCompliance: auditRow.uniform_compliance ?? undefined,
+          vaccinatorBehaviorAssessment: auditRow.vaccinator_behavior_assessment || undefined,
+          overallAuditResult: auditRow.overall_audit_result || undefined,
           checklist: auditRow.checklist,
           score: auditRow.score || undefined,
           remarks: auditRow.remarks || undefined,
