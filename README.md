@@ -60,7 +60,7 @@ Copy `.env.example` to `.env`, then set the Supabase project URL, public anon ke
 
 `DATABASE_URL` is a private migration-runner credential. Keep it only in a local ignored `.env` file or a secured CI secret, and never prefix it with `EXPO_PUBLIC_`.
 
-Production tagged releases require the GitHub Actions secrets `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Configure the same OAuth redirect URLs in Google Cloud and Supabase Auth for the deployed web domain.
+Production tagged releases require the GitHub Actions secrets `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Configure the OAuth redirect URLs in Google Cloud and Supabase Auth for the deployed web domain.
 
 ### Run Locally
 ```bash
