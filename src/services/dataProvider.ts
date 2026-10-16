@@ -439,6 +439,25 @@ export const dataProvider = {
 
   setCurrentUser: (user: UserProfile | null) => mockStore.setCurrentUser(user),
 
+  /** Re-fetch the current user's profile from Supabase to pick up
+   *  server-side changes (e.g. admin role/status updates). */
+  refreshCurrentUserProfile: async (): Promise<UserProfile | null> => {
+    const existing = mockStore.getCurrentUser();
+    if (!existing || !isSupabaseConfigured) return existing;
+
+    const { data, error } = await getSupabaseClient()
+      .from("profiles")
+      .select("*")
+      .eq("id", existing.id)
+      .maybeSingle();
+
+    if (error || !data) return existing;
+
+    const refreshed = mapProfileRow(data);
+    mockStore.setCurrentUser(refreshed);
+    return refreshed;
+  },
+
   // --- Users / Profiles ---
   getUsers: async (): Promise<UserProfile[]> => {
     if (isSupabaseConfigured) {

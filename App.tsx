@@ -1,6 +1,6 @@
 import './global.css';
 import React, { useState, useEffect } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, AppState, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -186,6 +186,46 @@ export default function App() {
       });
   }, []);
 
+  // Live-sync profile when admin changes the user's role/status via Supabase Realtime.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUser) return;
+
+    const channel = getSupabaseClient()
+      .channel(`profile-sync-${currentUser.id}`)
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${currentUser.id}`,
+        },
+        async () => {
+          const refreshed = await dataProvider.refreshCurrentUserProfile();
+          if (refreshed) setCurrentUser(refreshed);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      getSupabaseClient().removeChannel(channel);
+    };
+  }, [currentUser?.id]);
+
+  // Re-fetch profile when the app returns to foreground (fallback for missed realtime events).
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUser) return;
+
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const refreshed = await dataProvider.refreshCurrentUserProfile();
+        if (refreshed) setCurrentUser(refreshed);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [currentUser?.id]);
+
   const handleLogout = async () => {
     await dataProvider.signOut();
     setCurrentUser(null);
@@ -256,3 +296,4 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
