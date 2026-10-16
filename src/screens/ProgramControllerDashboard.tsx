@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { Check, CircleX, ClipboardCheck, Plus, RefreshCw, Send } from 'lucide-react-native';
+import { Check, CircleX, ClipboardCheck, Plus, RefreshCw, Search, Send, Users } from 'lucide-react-native';
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, ProgramCompletionMetrics, ProgramStatus } from '../types';
 import { dataProvider } from '../services';
@@ -69,6 +69,13 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
 
   // Team Details
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
+  const [empSearchQuery, setEmpSearchQuery] = useState<string>('');
+
+  const filteredAvailableEmployees = availableEmployees.filter(emp =>
+    emp.fullName.toLowerCase().includes(empSearchQuery.toLowerCase()) ||
+    (emp.employeeCode && emp.employeeCode.toLowerCase().includes(empSearchQuery.toLowerCase())) ||
+    emp.email.toLowerCase().includes(empSearchQuery.toLowerCase())
+  );
 
   // End Program / Send to Auditor Modal
   const [endingProgram, setEndingProgram] = useState<Program | null>(null);
@@ -592,50 +599,134 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
             </View>
 
             {/* SECTION 2: Team Details */}
-            <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
-              <View className="mb-2 flex-row items-center justify-between">
+            <View className="mb-2 rounded-2xl border border-black/[0.07] bg-slate-50/70 p-4">
+              <View className="mb-2.5 flex-row items-center justify-between">
                 <Text className="text-xs font-black uppercase tracking-wider text-marush-primary">
-                  2. Team Details
+                  2. Team Allocation
                 </Text>
-                <Text className={styles.availCount}>
-                  {availableEmployees.length} Available Staff
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-xs font-bold text-slate-500">
+                    {selectedEmpIds.length} Selected
+                  </Text>
+                  <Text className="text-slate-300">•</Text>
+                  <Text className="text-xs font-bold text-marush-secondary-dark">
+                    {availableEmployees.length} Available
+                  </Text>
+                </View>
+              </View>
+
+              <View className="mb-3 rounded-2xl bg-white p-3 border border-black/[0.06] shadow-sm">
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Controller (Creator)</Text>
+                <Text className="mt-0.5 text-xs font-bold text-slate-900">
+                  {currentUser.fullName} <Text className="font-mono text-slate-400">({currentUser.employeeCode || 'Lead Controller'})</Text>
                 </Text>
               </View>
 
-              <View className="mb-2 rounded-lg bg-white p-2.5 border border-marush-border">
-                <Text className="text-[11px] font-bold text-marush-muted">Program Controller Name</Text>
-                <Text className="text-xs font-extrabold text-marush-primary">
-                  {currentUser.fullName} ({currentUser.employeeCode || 'Lead Controller'})
-                </Text>
-              </View>
+              <View className="gap-2">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Select Vaccinators * ({selectedEmpIds.length} assigned)
+                  </Text>
+                  {selectedEmpIds.length > 0 && (
+                    <TouchableOpacity onPress={() => setSelectedEmpIds([])}>
+                      <Text className="text-xs font-semibold text-red-600">Clear selection</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-              <View className={styles.inputGroup}>
-                <Text className={styles.label}>Vaccinator Name(s) * (Tap to assign)</Text>
+                {/* Search Bar for Vaccinators */}
+                <View className="flex-row items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-3 shadow-sm">
+                  <Search size={15} color={Colors.textMuted} />
+                  <TextInput
+                    className="min-w-0 flex-1 py-2 text-xs text-slate-800"
+                    placeholder="Search by name, staff ID code, or email..."
+                    placeholderTextColor={Colors.textMuted}
+                    value={empSearchQuery}
+                    onChangeText={setEmpSearchQuery}
+                  />
+                  {empSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setEmpSearchQuery('')}>
+                      <CircleX size={15} color={Colors.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Vertically Scrollable List with Max Height */}
                 {availableEmployees.length === 0 ? (
-                  <View className={styles.noEmpBox}>
-                    <Text className={styles.noEmpWarning}>
+                  <View className="my-1 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5">
+                    <Text className="text-xs italic text-amber-800">
                       All field vaccinators are currently engaged in active programs.
                     </Text>
                   </View>
+                ) : filteredAvailableEmployees.length === 0 ? (
+                  <View className="my-1 items-center rounded-2xl border border-dashed border-black/[0.1] bg-white p-6">
+                    <Text className="text-xs font-semibold text-slate-600">No vaccinators found matching "{empSearchQuery}"</Text>
+                    <Text className="mt-0.5 text-[11px] text-slate-400">Try searching with a different name or staff code.</Text>
+                  </View>
                 ) : (
-                  <View className={styles.empListGrid}>
-                    {availableEmployees.map(emp => {
-                      const isSelected = selectedEmpIds.includes(emp.id);
-                      return (
-                        <TouchableOpacity
-                          key={emp.id}
-                          className={`${styles.empPill} ${isSelected ? styles.empPillSelected : ''}`}
-                          onPress={() => toggleSelectEmployee(emp.id)}
-                        >
-                          <View className="flex-row items-center gap-1.5">
-                            {isSelected ? <Check size={14} color={Colors.primary} /> : <Plus size={14} color={Colors.textSecondary} />}
-                            <Text className={`${styles.empPillText} ${isSelected ? styles.empPillTextSelected : ''}`}>
-                              {emp.fullName} ({emp.employeeCode || 'Vaccinator'})
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
+                  <View className="max-h-[260px] rounded-2xl border border-black/[0.08] bg-white shadow-inner overflow-hidden">
+                    <ScrollView
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={true}
+                      contentContainerClassName="p-2 gap-1.5"
+                    >
+                      {filteredAvailableEmployees.map(emp => {
+                        const isSelected = selectedEmpIds.includes(emp.id);
+                        return (
+                          <TouchableOpacity
+                            key={emp.id}
+                            className={`flex-row items-center justify-between rounded-xl px-3.5 py-2.5 transition-all active:scale-[0.99] border ${
+                              isSelected
+                                ? 'border-marush-primary/30 bg-marush-primary-subtle'
+                                : 'border-transparent bg-slate-50/80 hover:bg-slate-100'
+                            }`}
+                            onPress={() => toggleSelectEmployee(emp.id)}
+                          >
+                            <View className="min-w-0 flex-1 flex-row items-center gap-3">
+                              <View
+                                className={`h-8 w-8 items-center justify-center rounded-lg border ${
+                                  isSelected
+                                    ? 'border-marush-primary bg-marush-primary'
+                                    : 'border-black/[0.1] bg-white'
+                                }`}
+                              >
+                                {isSelected ? (
+                                  <Check size={14} color={Colors.white} strokeWidth={2.6} />
+                                ) : (
+                                  <Text className="text-xs font-bold text-slate-500">
+                                    {emp.fullName.trim().slice(0, 1).toUpperCase()}
+                                  </Text>
+                                )}
+                              </View>
+                              <View className="min-w-0 flex-1">
+                                <Text className={`text-xs font-bold ${isSelected ? 'text-marush-primary' : 'text-slate-900'}`}>
+                                  {emp.fullName}
+                                </Text>
+                                <Text className="text-[11px] font-mono text-slate-400">
+                                  ID: {emp.employeeCode || 'Not assigned'} • {emp.email}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View
+                              className={`rounded-full px-2.5 py-0.5 border ${
+                                isSelected
+                                  ? 'bg-marush-primary border-marush-primary'
+                                  : 'bg-white border-black/[0.08]'
+                              }`}
+                            >
+                              <Text
+                                className={`text-[10px] font-bold ${
+                                  isSelected ? 'text-white' : 'text-slate-600'
+                                }`}
+                              >
+                                {isSelected ? 'ASSIGNED' : 'TAP TO ADD'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
                   </View>
                 )}
               </View>
