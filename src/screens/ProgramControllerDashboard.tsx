@@ -13,6 +13,7 @@ import { Check, CircleX, ClipboardCheck, Plus, RefreshCw, Send } from 'lucide-re
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, ProgramCompletionMetrics, ProgramStatus } from '../types';
 import { dataProvider } from '../services';
+import { useConfirmDialog } from '../components/ConfirmDialog';
 
 interface ProgramControllerDashboardProps {
   currentUser: UserProfile;
@@ -79,6 +80,8 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   const [equipmentCheckPassed, setEquipmentCheckPassed] = useState(true);
   const [farmFlockNotes, setFarmFlockNotes] = useState('Flock condition optimal. Sterilization protocol followed.');
 
+  const { confirm, ConfirmDialogElement } = useConfirmDialog();
+
   const refreshData = useCallback(async () => {
     setLoading(true);
     try {
@@ -118,7 +121,7 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
     }
   };
 
-  const handleInitiateProgram = async () => {
+  const handleInitiateProgram = () => {
     if (!programName.trim() || !hatcheryOrFarm.trim()) {
       Toast.show({
         type: 'error',
@@ -158,64 +161,74 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
       .map(v => v.trim())
       .filter(Boolean);
 
-    setSubmitting(true);
-    try {
-      const newProg = await dataProvider.createProgram({
-        programName: programName.trim(),
-        hatcheryOrFarmName: hatcheryOrFarm.trim(),
-        farmAddress: farmAddress.trim() || undefined,
-        farmManagerName: farmManagerName.trim() || undefined,
-        flockSize: finalFlockSize,
-        birdDetails: {
-          b: bCount || undefined,
-          l: lCount || undefined,
-          br: brCount || undefined,
-          total: finalFlockSize,
-        },
-        vaccinesUsed: vaccinesArray.length > 0 ? vaccinesArray : ['Vectormune ND + Cevac Transmune'],
-        scheduledStartDate: startDate,
-        scheduledStartTime: startTime,
-        scheduledEndDate: endDate,
-        scheduledEndTime: endTime,
-        travelDepartureTime: travelDepartureTime.trim() || undefined,
-        travelArrivalTime: travelArrivalTime.trim() || undefined,
-        returnDepartureTime: returnDepartureTime.trim() || undefined,
-        returnArrivalTime: returnArrivalTime.trim() || undefined,
-        vaccinationStartedAt: vaccinationStartedAtTime ? `${startDate}T${vaccinationStartedAtTime}` : undefined,
-        vaccinationCompletedAt: vaccinationCompletedAtTime ? `${endDate}T${vaccinationCompletedAtTime}` : undefined,
-        controllerRemarks: controllerRemarks.trim() || undefined,
-        controllerId: currentUser.id,
-        teamMemberIds: selectedEmpIds,
-      });
+    confirm({
+      title: 'Submit Program Schedule',
+      message: `Submit "${programName.trim()}" for ${finalFlockSize.toLocaleString()} birds at "${hatcheryOrFarm.trim()}" with ${selectedEmpIds.length} team members to Admin for review?`,
+      confirmText: 'Submit to Admin',
+      cancelText: 'Cancel',
+      variant: 'primary',
+      icon: 'send',
+      onConfirm: async () => {
+        setSubmitting(true);
+        try {
+          const newProg = await dataProvider.createProgram({
+            programName: programName.trim(),
+            hatcheryOrFarmName: hatcheryOrFarm.trim(),
+            farmAddress: farmAddress.trim() || undefined,
+            farmManagerName: farmManagerName.trim() || undefined,
+            flockSize: finalFlockSize,
+            birdDetails: {
+              b: bCount || undefined,
+              l: lCount || undefined,
+              br: brCount || undefined,
+              total: finalFlockSize,
+            },
+            vaccinesUsed: vaccinesArray.length > 0 ? vaccinesArray : ['Vectormune ND + Cevac Transmune'],
+            scheduledStartDate: startDate,
+            scheduledStartTime: startTime,
+            scheduledEndDate: endDate,
+            scheduledEndTime: endTime,
+            travelDepartureTime: travelDepartureTime.trim() || undefined,
+            travelArrivalTime: travelArrivalTime.trim() || undefined,
+            returnDepartureTime: returnDepartureTime.trim() || undefined,
+            returnArrivalTime: returnArrivalTime.trim() || undefined,
+            vaccinationStartedAt: vaccinationStartedAtTime ? `${startDate}T${vaccinationStartedAtTime}` : undefined,
+            vaccinationCompletedAt: vaccinationCompletedAtTime ? `${endDate}T${vaccinationCompletedAtTime}` : undefined,
+            controllerRemarks: controllerRemarks.trim() || undefined,
+            controllerId: currentUser.id,
+            teamMemberIds: selectedEmpIds,
+          });
 
-      Toast.show({
-        type: 'success',
-        text1: 'Program Submitted to Admin',
-        text2: `${newProg.programName} sent for admin review and auditor assignment.`,
-      });
+          Toast.show({
+            type: 'success',
+            text1: 'Program Submitted to Admin',
+            text2: `${newProg.programName} sent for admin review and auditor assignment.`,
+          });
 
-      // Reset Form
-      setProgramName('');
-      setHatcheryOrFarm('');
-      setFarmAddress('');
-      setFarmManagerName('');
-      setBirdBreeder('');
-      setBirdLayer('');
-      setBirdBroiler('');
-      setFlockSize('');
-      setControllerRemarks('');
-      setSelectedEmpIds([]);
-      setActiveTab('my_programs');
-      refreshData();
-    } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Submission Failed',
-        text2: err?.message || 'Could not initiate program.',
-      });
-    } finally {
-      setSubmitting(false);
-    }
+          // Reset Form
+          setProgramName('');
+          setHatcheryOrFarm('');
+          setFarmAddress('');
+          setFarmManagerName('');
+          setBirdBreeder('');
+          setBirdLayer('');
+          setBirdBroiler('');
+          setFlockSize('');
+          setControllerRemarks('');
+          setSelectedEmpIds([]);
+          setActiveTab('my_programs');
+          refreshData();
+        } catch (err: any) {
+          Toast.show({
+            type: 'error',
+            text1: 'Submission Failed',
+            text2: err?.message || 'Could not initiate program.',
+          });
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
   };
 
   const handleOpenEndProgram = (prog: Program) => {
@@ -229,40 +242,50 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
     setFarmFlockNotes('Vaccination carried out per Ceva standard protocol. Cold-chain verified.');
   };
 
-  const handleConfirmEndProgram = async () => {
+  const handleConfirmEndProgram = () => {
     if (!endingProgram) return;
 
-    setSubmitting(true);
-    try {
-      const metrics: ProgramCompletionMetrics = {
-        birdsVaccinated: parseInt(birdsVaccinated.trim(), 10) || endingProgram.flockSize,
-        dosagePerBird: dosagePerBird.trim(),
-        batchNumber: batchNumber.trim(),
-        vaccineType: vaccineType.trim(),
-        coldChainTempCelsius: parseFloat(coldChainTemp.trim()) || 4.0,
-        equipmentCheckPassed,
-        farmFlockObservations: farmFlockNotes.trim(),
-      };
+    confirm({
+      title: 'Complete Program & Notify Auditor',
+      message: `Finalize vaccination records for "${endingProgram.programName}" (${birdsVaccinated || endingProgram.flockSize} birds) and forward to Program Auditor for audit sign-off?`,
+      confirmText: 'Send to Auditor',
+      cancelText: 'Back',
+      variant: 'primary',
+      icon: 'send',
+      onConfirm: async () => {
+        setSubmitting(true);
+        try {
+          const metrics: ProgramCompletionMetrics = {
+            birdsVaccinated: parseInt(birdsVaccinated.trim(), 10) || endingProgram.flockSize,
+            dosagePerBird: dosagePerBird.trim(),
+            batchNumber: batchNumber.trim(),
+            vaccineType: vaccineType.trim(),
+            coldChainTempCelsius: parseFloat(coldChainTemp.trim()) || 4.0,
+            equipmentCheckPassed,
+            farmFlockObservations: farmFlockNotes.trim(),
+          };
 
-      await dataProvider.submitProgramCompletion(endingProgram.id, metrics);
+          await dataProvider.submitProgramCompletion(endingProgram.id, metrics);
 
-      Toast.show({
-        type: 'success',
-        text1: 'Program Ended & Submitted',
-        text2: 'Details forwarded to Program Auditor for remarks.',
-      });
+          Toast.show({
+            type: 'success',
+            text1: 'Program Ended & Submitted',
+            text2: 'Details forwarded to Program Auditor for remarks.',
+          });
 
-      setEndingProgram(null);
-      refreshData();
-    } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Submission Error',
-        text2: err?.message || 'Could not complete program.',
-      });
-    } finally {
-      setSubmitting(false);
-    }
+          setEndingProgram(null);
+          refreshData();
+        } catch (err: any) {
+          Toast.show({
+            type: 'error',
+            text1: 'Submission Error',
+            text2: err?.message || 'Could not finalize program.',
+          });
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
   };
 
   return (
@@ -874,6 +897,8 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
           </View>
         </Modal>
       )}
+
+      {ConfirmDialogElement}
     </View>
   );
 };

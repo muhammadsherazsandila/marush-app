@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import { Colors } from '../constants/colors';
 import { UserProfile } from '../types';
+import { useConfirmDialog } from '../components/ConfirmDialog';
 
 interface ProfileScreenProps {
   user: UserProfile;
@@ -28,12 +29,26 @@ const roleLabels: Record<string, string> = {
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) => {
   const { width } = useWindowDimensions();
   const isCompact = width < 640;
+  const { confirm, ConfirmDialogElement } = useConfirmDialog();
+
   const initials = user.fullName
     .trim()
     .split(/\s+/)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
+
+  const handleLogoutPress = () => {
+    confirm({
+      title: 'Sign Out',
+      message: `Are you sure you want to log out of your session as ${user.fullName}? You will need to sign in again to access the operations workspace.`,
+      confirmText: 'Sign Out',
+      cancelText: 'Stay Signed In',
+      variant: 'danger',
+      icon: 'logout',
+      onConfirm: onLogout,
+    });
+  };
 
   return (
     <ScrollView className="flex-1 bg-slate-50">
@@ -109,7 +124,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) 
           {/* Tactile Logout Button */}
           <TouchableOpacity
             className="mt-8 flex-row items-center justify-between rounded-2xl border border-red-200/80 bg-red-50/60 px-5 py-4 shadow-sm transition-all"
-            onPress={onLogout}
+            onPress={handleLogoutPress}
             accessibilityRole="button"
             activeOpacity={0.8}
             {...(Platform.OS === 'web'
@@ -124,13 +139,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) 
               <View className="rounded-xl bg-white p-2 border border-red-100 shadow-sm">
                 <LogOut size={16} color="#DC2626" strokeWidth={2.4} />
               </View>
+              <View>
                 <Text className="text-sm font-bold text-red-700">Sign Out of Session</Text>
                 <Text className="text-[11px] text-red-600/80">End active session securely on this device</Text>
+              </View>
             </View>
             <ChevronRight size={17} color="#DC2626" />
           </TouchableOpacity>
         </View>
       </View>
+      {ConfirmDialogElement}
     </ScrollView>
   );
 };

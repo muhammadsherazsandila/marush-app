@@ -13,6 +13,7 @@ import { Check, ClipboardCheck, RefreshCw, ShieldCheck } from 'lucide-react-nati
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, AuditChecklistItem } from '../types';
 import { dataProvider } from '../services';
+import { useConfirmDialog } from '../components/ConfirmDialog';
 
 interface ProgramAuditorDashboardProps {
   currentUser: UserProfile;
@@ -50,6 +51,8 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
   const [uniformCompliance, setUniformCompliance] = useState(true);
   const [vaccinatorBehaviorAssessment, setVaccinatorBehaviorAssessment] = useState('Professional conduct, standard bio-security protocol followed diligently.');
   const [overallAuditResult, setOverallAuditResult] = useState<'approved' | 'conditional_approval' | 'rejected'>('approved');
+
+  const { confirm, ConfirmDialogElement } = useConfirmDialog();
 
   const refreshData = useCallback(async () => {
     setLoading(true);
@@ -104,7 +107,7 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
     setChecklist(updated);
   };
 
-  const handleSignOffAudit = async () => {
+  const handleSignOffAudit = () => {
     if (!auditingProgram) return;
 
     if (!remarks.trim()) {
@@ -126,42 +129,58 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
       return;
     }
 
-    setSubmitting(true);
-    try {
-      await dataProvider.submitAuditRemarks(
-        auditingProgram.id,
-        currentUser.id,
-        remarks.trim(),
-        auditScoreNum,
-        checklist,
-        {
-          birdCountVerified,
-          vaccineVerified,
-          timingVerified,
-          vaccinationQualityAssessment: vaccinationQualityAssessment.trim(),
-          uniformCompliance,
-          vaccinatorBehaviorAssessment: vaccinatorBehaviorAssessment.trim(),
-          overallAuditResult,
+    const outcomeLabels: Record<string, string> = {
+      approved: 'Approved',
+      conditional_approval: 'Conditional Approval',
+      rejected: 'Rejected',
+    };
+
+    confirm({
+      title: 'Sign Off Quality Audit',
+      message: `Complete quality sign-off for "${auditingProgram.programName}" with score ${auditScoreNum}/100 and verdict "${outcomeLabels[overallAuditResult] || overallAuditResult}"? This will mark the program as completed.`,
+      confirmText: 'Sign Off & Complete',
+      cancelText: 'Back',
+      variant: overallAuditResult === 'rejected' ? 'danger' : 'primary',
+      icon: overallAuditResult === 'rejected' ? 'alert' : 'shield',
+      onConfirm: async () => {
+        setSubmitting(true);
+        try {
+          await dataProvider.submitAuditRemarks(
+            auditingProgram.id,
+            currentUser.id,
+            remarks.trim(),
+            auditScoreNum,
+            checklist,
+            {
+              birdCountVerified,
+              vaccineVerified,
+              timingVerified,
+              vaccinationQualityAssessment: vaccinationQualityAssessment.trim(),
+              uniformCompliance,
+              vaccinatorBehaviorAssessment: vaccinatorBehaviorAssessment.trim(),
+              overallAuditResult,
+            }
+          );
+
+          Toast.show({
+            type: 'success',
+            text1: 'Audit Signed Off & Program Completed',
+            text2: `${auditingProgram.programName} marked as DONE and synchronized with Admin records.`,
+          });
+
+          setAuditingProgram(null);
+          refreshData();
+        } catch (err: any) {
+          Toast.show({
+            type: 'error',
+            text1: 'Audit Submission Failed',
+            text2: err?.message || 'Could not complete audit.',
+          });
+        } finally {
+          setSubmitting(false);
         }
-      );
-
-      Toast.show({
-        type: 'success',
-        text1: 'Audit Signed Off & Program Completed',
-        text2: `${auditingProgram.programName} marked as DONE and synchronized with Admin records.`,
-      });
-
-      setAuditingProgram(null);
-      refreshData();
-    } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Audit Submission Failed',
-        text2: err?.message || 'Could not complete audit.',
-      });
-    } finally {
-      setSubmitting(false);
-    }
+      },
+    });
   };
 
   return (
@@ -566,6 +585,8 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
           </View>
         </Modal>
       )}
+
+      {ConfirmDialogElement}
     </View>
   );
 };

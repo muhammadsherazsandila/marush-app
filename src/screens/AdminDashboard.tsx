@@ -28,6 +28,7 @@ import {
 import { Colors } from '../constants/colors';
 import { UserProfile, Program, UserRole } from '../types';
 import { dataProvider } from '../services';
+import { useConfirmDialog } from '../components/ConfirmDialog';
 
 interface AdminDashboardProps {
   currentUser: UserProfile;
@@ -59,6 +60,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
   // Auditor Assignment Modal for Team Approval
   const [approvingProgram, setApprovingProgram] = useState<Program | null>(null);
   const [selectedAuditorId, setSelectedAuditorId] = useState<string>('');
+
+  const { confirm, ConfirmDialogElement } = useConfirmDialog();
 
   const refreshData = useCallback(async () => {
     setLoading(true);
@@ -183,7 +186,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
     refreshData();
   };
 
-  const handleDeleteEmployee = async (targetUser: UserProfile) => {
+  const handleDeleteEmployee = (targetUser: UserProfile) => {
     if (targetUser.role === 'admin') {
       Toast.show({
         type: 'error',
@@ -192,29 +195,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
       });
       return;
     }
-    try {
-      await dataProvider.deleteUser(targetUser.id);
-      Toast.show({ type: 'info', text1: 'Deleted', text2: `${targetUser.fullName || 'Employee'} removed from system.` });
-      refreshData();
-    } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Deletion Failed',
-        text2: err?.message || 'Could not delete employee.',
-      });
-    }
+
+    confirm({
+      title: 'Delete Employee',
+      message: `Are you sure you want to permanently delete "${targetUser.fullName || targetUser.email}"? This action cannot be undone and will revoke all access immediately.`,
+      confirmText: 'Delete Employee',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: async () => {
+        try {
+          await dataProvider.deleteUser(targetUser.id);
+          Toast.show({ type: 'info', text1: 'Deleted', text2: `${targetUser.fullName || 'Employee'} removed from system.` });
+          refreshData();
+        } catch (err: any) {
+          Toast.show({
+            type: 'error',
+            text1: 'Deletion Failed',
+            text2: err?.message || 'Could not delete employee.',
+          });
+        }
+      },
+    });
   };
 
-  const handleApproveUser = async (id: string) => {
-    await dataProvider.updateUserStatus(id, 'approved');
-    Toast.show({ type: 'success', text1: 'User Approved', text2: 'Account verified.' });
-    refreshData();
+  const handleApproveUser = (targetUser: UserProfile) => {
+    confirm({
+      title: 'Approve User Access',
+      message: `Grant access to "${targetUser.fullName || targetUser.email}" with role "${(targetUser.requestedRole || targetUser.role).replace('_', ' ').toUpperCase()}"?`,
+      confirmText: 'Approve Access',
+      cancelText: 'Cancel',
+      variant: 'primary',
+      icon: 'user-check',
+      onConfirm: async () => {
+        await dataProvider.updateUserStatus(targetUser.id, 'approved');
+        Toast.show({ type: 'success', text1: 'User Approved', text2: `${targetUser.fullName} account verified.` });
+        refreshData();
+      },
+    });
   };
 
-  const handleRejectUser = async (id: string) => {
-    await dataProvider.updateUserStatus(id, 'rejected');
-    Toast.show({ type: 'error', text1: 'User Rejected', text2: 'Account access declined.' });
-    refreshData();
+  const handleRejectUser = (targetUser: UserProfile) => {
+    confirm({
+      title: 'Decline User Access',
+      message: `Are you sure you want to reject the registration request for "${targetUser.fullName || targetUser.email}"?`,
+      confirmText: 'Reject Request',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      icon: 'user-x',
+      onConfirm: async () => {
+        await dataProvider.updateUserStatus(targetUser.id, 'rejected');
+        Toast.show({ type: 'error', text1: 'User Rejected', text2: `${targetUser.fullName} account access declined.` });
+        refreshData();
+      },
+    });
   };
 
   // Program Approval & Auditor Assignment
@@ -225,21 +259,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
     }
   };
 
-  const handleConfirmTeamApproval = async () => {
+  const handleConfirmTeamApproval = () => {
     if (!approvingProgram) return;
     if (!selectedAuditorId) {
       Toast.show({ type: 'error', text1: 'Auditor Required', text2: 'Please assign a Program Auditor.' });
       return;
     }
 
-    await dataProvider.approveProgramAndStart(approvingProgram.id, selectedAuditorId);
-    Toast.show({
-      type: 'success',
-      text1: 'Program Approved & Started',
-      text2: `${approvingProgram.programName} is now ACTIVE!`,
+    const assignedAuditor = auditors.find(a => a.id === selectedAuditorId);
+    const auditorName = assignedAuditor ? assignedAuditor.fullName : 'Selected Auditor';
+
+    confirm({
+      title: 'Start Program & Assign Auditor',
+      message: `Are you sure you want to approve "${approvingProgram.programName}" and assign ${auditorName} as the Program Auditor? The program will immediately become ACTIVE.`,
+      confirmText: 'Approve & Start',
+      cancelText: 'Back',
+      variant: 'primary',
+      icon: 'shield',
+      onConfirm: async () => {
+        await dataProvider.approveProgramAndStart(approvingProgram.id, selectedAuditorId);
+        Toast.show({
+          type: 'success',
+          text1: 'Program Approved & Started',
+          text2: `${approvingProgram.programName} is now ACTIVE!`,
+        });
+        setApprovingProgram(null);
+        refreshData();
+      },
     });
-    setApprovingProgram(null);
-    refreshData();
   };
 
   const isProgramView =
@@ -797,7 +844,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
                   <View className={styles.approvalBtnRow}>
                     <TouchableOpacity
                       className={styles.approveUserBtn}
-                      onPress={() => handleApproveUser(user.id)}
+                      onPress={() => handleApproveUser(user)}
                     >
                       <View className="flex-row items-center justify-center gap-1.5">
                         <Check size={15} color={Colors.white} />
@@ -806,7 +853,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
                     </TouchableOpacity>
                     <TouchableOpacity
                       className={styles.rejectUserBtn}
-                      onPress={() => handleRejectUser(user.id)}
+                      onPress={() => handleRejectUser(user)}
                     >
                       <View className="flex-row items-center justify-center gap-1.5">
                         <X size={15} color={Colors.white} />
@@ -1185,6 +1232,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
           </View>
         </Modal>
       )}
+
+      {ConfirmDialogElement}
     </View>
   );
 };
