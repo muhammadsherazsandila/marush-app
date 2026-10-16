@@ -830,56 +830,230 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
               <Text className={styles.modalSub}>{selectedProgram.hatcheryOrFarmName}</Text>
 
               <ScrollView className={styles.modalBody}>
-                <View className={styles.detailRow}>
-                  <Text className={styles.detailLabel}>Status:</Text>
-                  <Text className={`${styles.detailValue} font-extrabold text-marush-primary-light`}>
-                    COMPLETED
-                  </Text>
-                </View>
-                <View className={styles.detailRow}>
-                  <Text className={styles.detailLabel}>Controller:</Text>
-                  <Text className={styles.detailValue}>{selectedProgram.controllerName}</Text>
-                </View>
-                <View className={styles.detailRow}>
-                  <Text className={styles.detailLabel}>Auditor:</Text>
-                  <Text className={styles.detailValue}>{selectedProgram.auditorName}</Text>
-                </View>
-                <View className={styles.detailRow}>
-                  <Text className={styles.detailLabel}>Flock Size:</Text>
-                  <Text className={styles.detailValue}>{selectedProgram.flockSize.toLocaleString()} birds</Text>
+                {/* 1. Status & Basic Details */}
+                <View className="mb-3 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+                  <View className="flex-row items-center justify-between border-b border-marush-border/50 pb-2">
+                    <Text className="text-xs font-black uppercase tracking-wider text-marush-primary">
+                      Program Status
+                    </Text>
+                    <View className="rounded-md bg-marush-primary px-2.5 py-1">
+                      <Text className="text-[10px] font-extrabold uppercase text-white">
+                        {selectedProgram.status.replace('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="mt-2.5 gap-1.5 text-xs">
+                    <View className="flex-row justify-between">
+                      <Text className="text-[11px] font-bold text-marush-muted">Farm / Hatchery:</Text>
+                      <Text className="text-[11px] font-semibold text-marush-text">{selectedProgram.hatcheryOrFarmName}</Text>
+                    </View>
+
+                    {selectedProgram.farmAddress && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-[11px] font-bold text-marush-muted">Farm Address:</Text>
+                        <Text className="text-[11px] text-marush-text">{selectedProgram.farmAddress}</Text>
+                      </View>
+                    )}
+
+                    {selectedProgram.farmManagerName && (
+                      <View className="flex-row justify-between">
+                        <Text className="text-[11px] font-bold text-marush-muted">Farm / Hatchery Manager:</Text>
+                        <Text className="text-[11px] font-semibold text-marush-text">{selectedProgram.farmManagerName}</Text>
+                      </View>
+                    )}
+
+                    <View className="flex-row justify-between">
+                      <Text className="text-[11px] font-bold text-marush-muted">Lead Controller:</Text>
+                      <Text className="text-[11px] font-bold text-marush-primary">{selectedProgram.controllerName || 'Dr. Tariq Mahmood'}</Text>
+                    </View>
+
+                    <View className="flex-row justify-between">
+                      <Text className="text-[11px] font-bold text-marush-muted">Assigned Auditor:</Text>
+                      <Text className="text-[11px] font-bold text-marush-secondary-dark">{selectedProgram.auditorName || 'Pending Assignment'}</Text>
+                    </View>
+
+                    <View className="flex-row justify-between">
+                      <Text className="text-[11px] font-bold text-marush-muted">Vaccinator Team:</Text>
+                      <Text className="max-w-[220px] text-right text-[11px] text-marush-text">
+                        {selectedProgram.teamMembers && selectedProgram.teamMembers.length > 0
+                          ? selectedProgram.teamMembers.map(m => m.fullName).join(', ')
+                          : `${selectedProgram.teamMemberIds?.length || 0} members assigned`}
+                      </Text>
+                    </View>
+
+                    <View className="flex-row justify-between">
+                      <Text className="text-[11px] font-bold text-marush-muted">Date & Time:</Text>
+                      <Text className="text-[11px] text-marush-text">
+                        {selectedProgram.scheduledStartDate} at {selectedProgram.scheduledStartTime}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
-                {selectedProgram.completionMetrics && (
-                  <View className={styles.metricsBox}>
-                    <Text className={styles.metricsBoxTitle}>Vaccination & Monitoring Metrics</Text>
-                    <Text className={styles.metricLine}>
-                      Ã¢â‚¬Â¢ Birds Vaccinated: {selectedProgram.completionMetrics.birdsVaccinated.toLocaleString()}
+                {/* 2. Bird Details & Vaccines */}
+                <View className="mb-3 rounded-xl border border-marush-border bg-white p-3.5">
+                  <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                    Flock & Vaccine Specifications
+                  </Text>
+                  
+                  <View className="gap-1.5">
+                    <View className="flex-row justify-between border-b border-marush-border/50 pb-1">
+                      <Text className="text-[11px] font-bold text-marush-muted">Total Flock Size:</Text>
+                      <Text className="text-[11px] font-extrabold text-marush-text">{selectedProgram.flockSize.toLocaleString()} birds</Text>
+                    </View>
+
+                    {selectedProgram.birdDetails && (
+                      <View className="flex-row justify-between border-b border-marush-border/50 pb-1">
+                        <Text className="text-[11px] font-bold text-marush-muted">Categorized Flock Breakdown:</Text>
+                        <Text className="text-[11px] text-marush-text">
+                          B: {selectedProgram.birdDetails.b || 0} • L: {selectedProgram.birdDetails.l || 0} • Br: {selectedProgram.birdDetails.br || 0}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View className="flex-row justify-between pt-0.5">
+                      <Text className="text-[11px] font-bold text-marush-muted">Vaccine(s) Used:</Text>
+                      <Text className="max-w-[200px] text-right text-[11px] font-semibold text-marush-text">
+                        {selectedProgram.vaccinesUsed && selectedProgram.vaccinesUsed.length > 0
+                          ? selectedProgram.vaccinesUsed.join(', ')
+                          : (selectedProgram.completionMetrics?.vaccineType || 'Standard Ceva Program')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* 3. Travel & Field Timings */}
+                {(selectedProgram.travelDepartureTime || selectedProgram.travelArrivalTime || selectedProgram.returnDepartureTime || selectedProgram.returnArrivalTime) && (
+                  <View className="mb-3 rounded-xl border border-marush-border bg-white p-3.5">
+                    <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+                      Travel & Return Schedule
                     </Text>
-                    <Text className={styles.metricLine}>
-                      Ã¢â‚¬Â¢ Dosage: {selectedProgram.completionMetrics.dosagePerBird}
-                    </Text>
-                    <Text className={styles.metricLine}>
-                      Ã¢â‚¬Â¢ Vaccine Type: {selectedProgram.completionMetrics.vaccineType}
-                    </Text>
-                    <Text className={styles.metricLine}>
-                      Ã¢â‚¬Â¢ Batch #: {selectedProgram.completionMetrics.batchNumber}
-                    </Text>
-                    <Text className={styles.metricLine}>
-                      Ã¢â‚¬Â¢ Cold Chain Temp: {selectedProgram.completionMetrics.coldChainTempCelsius}Ã‚Â°C
-                    </Text>
-                    <Text className={styles.metricLine}>
-                      Ã¢â‚¬Â¢ Observations: {selectedProgram.completionMetrics.farmFlockObservations}
-                    </Text>
+                    
+                    <View className="gap-1 text-xs">
+                      <View className="flex-row justify-between">
+                        <Text className="text-[11px] font-bold text-marush-muted">Departure from Office:</Text>
+                        <Text className="text-[11px] text-marush-text">{selectedProgram.travelDepartureTime || 'N/A'}</Text>
+                      </View>
+                      <View className="flex-row justify-between">
+                        <Text className="text-[11px] font-bold text-marush-muted">Arrival at Farm:</Text>
+                        <Text className="text-[11px] text-marush-text">{selectedProgram.travelArrivalTime || 'N/A'}</Text>
+                      </View>
+                      <View className="flex-row justify-between">
+                        <Text className="text-[11px] font-bold text-marush-muted">Departure from Farm:</Text>
+                        <Text className="text-[11px] text-marush-text">{selectedProgram.returnDepartureTime || 'N/A'}</Text>
+                      </View>
+                      <View className="flex-row justify-between">
+                        <Text className="text-[11px] font-bold text-marush-muted">Return to Office:</Text>
+                        <Text className="text-[11px] text-marush-text">{selectedProgram.returnArrivalTime || 'N/A'}</Text>
+                      </View>
+                    </View>
                   </View>
                 )}
 
-                {selectedProgram.auditorRemarks && (
-                  <View className={styles.auditorBox}>
-                    <Text className={styles.auditorBoxTitle}>Auditor Sign-off & Remarks</Text>
-                    <Text className={styles.auditorRemarksText}>{selectedProgram.auditorRemarks}</Text>
-                    {selectedProgram.auditScore ? (
-                      <Text className={styles.scoreBadge}>Score: {selectedProgram.auditScore}/100</Text>
-                    ) : null}
+                {/* 4. Controller Remarks */}
+                {selectedProgram.controllerRemarks && (
+                  <View className="mb-3 rounded-xl border border-marush-border bg-marush-subtle/30 p-3.5">
+                    <Text className="mb-1 text-xs font-black uppercase tracking-wider text-marush-primary">
+                      Controller Observations & Remarks
+                    </Text>
+                    <Text className="text-xs italic text-marush-text">"{selectedProgram.controllerRemarks}"</Text>
+                  </View>
+                )}
+
+                {/* 5. Auditor Findings & Remarks */}
+                {(selectedProgram.auditorRemarks || selectedProgram.auditDetails) && (
+                  <View className="mb-3 rounded-xl border border-marush-border bg-white p-3.5">
+                    <View className="flex-row items-center justify-between border-b border-marush-border/50 pb-2">
+                      <Text className="text-xs font-black uppercase tracking-wider text-marush-primary">
+                        Auditor Quality Findings & Audit Form
+                      </Text>
+                      {selectedProgram.auditScore ? (
+                        <View className="rounded-md bg-marush-subtle px-2 py-0.5">
+                          <Text className="text-xs font-bold text-marush-primary">Score: {selectedProgram.auditScore}/100</Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    <View className="mt-2.5 gap-2">
+                      {selectedProgram.auditDetails && (
+                        <View className="gap-1.5 border-b border-marush-border/50 pb-2">
+                          <View className="flex-row justify-between">
+                            <Text className="text-[11px] font-bold text-marush-muted">Bird Count Verification:</Text>
+                            <Text className={`text-[11px] font-bold ${selectedProgram.auditDetails.birdCountVerified !== false ? 'text-green-600' : 'text-red-600'}`}>
+                              {selectedProgram.auditDetails.birdCountVerified !== false ? '✓ Verified Correct' : '✕ Discrepancy'}
+                            </Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-[11px] font-bold text-marush-muted">Vaccine Verification:</Text>
+                            <Text className={`text-[11px] font-bold ${selectedProgram.auditDetails.vaccineVerified !== false ? 'text-green-600' : 'text-red-600'}`}>
+                              {selectedProgram.auditDetails.vaccineVerified !== false ? '✓ Verified Matching' : '✕ Discrepancy'}
+                            </Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-[11px] font-bold text-marush-muted">Timing Verification:</Text>
+                            <Text className={`text-[11px] font-bold ${selectedProgram.auditDetails.timingVerified !== false ? 'text-green-600' : 'text-red-600'}`}>
+                              {selectedProgram.auditDetails.timingVerified !== false ? '✓ Timings Verified' : '✕ Discrepancy'}
+                            </Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-[11px] font-bold text-marush-muted">Uniform & PPE Compliance:</Text>
+                            <Text className={`text-[11px] font-bold ${selectedProgram.auditDetails.uniformCompliance !== false ? 'text-green-600' : 'text-red-600'}`}>
+                              {selectedProgram.auditDetails.uniformCompliance !== false ? '✓ Compliant' : '✕ Non-Compliant'}
+                            </Text>
+                          </View>
+                          {selectedProgram.auditDetails.overallAuditResult && (
+                            <View className="flex-row justify-between">
+                              <Text className="text-[11px] font-bold text-marush-muted">Overall Audit Result:</Text>
+                              <Text className="text-[11px] font-extrabold uppercase text-marush-primary">
+                                {selectedProgram.auditDetails.overallAuditResult.replace('_', ' ')}
+                              </Text>
+                            </View>
+                          )}
+                          {selectedProgram.auditDetails.vaccinationQualityAssessment && (
+                            <View className="pt-1">
+                              <Text className="text-[11px] font-bold text-marush-muted">Quality Assessment:</Text>
+                              <Text className="text-[11px] text-marush-text">{selectedProgram.auditDetails.vaccinationQualityAssessment}</Text>
+                            </View>
+                          )}
+                          {selectedProgram.auditDetails.vaccinatorBehaviorAssessment && (
+                            <View className="pt-1">
+                              <Text className="text-[11px] font-bold text-marush-muted">Vaccinator Behavior:</Text>
+                              <Text className="text-[11px] text-marush-text">{selectedProgram.auditDetails.vaccinatorBehaviorAssessment}</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {selectedProgram.auditorRemarks && (
+                        <View className="pt-1">
+                          <Text className="text-[11px] font-bold text-marush-muted">Auditor Remarks & Recommendations:</Text>
+                          <Text className="mt-1 text-xs italic text-marush-primary-dark">"{selectedProgram.auditorRemarks}"</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* 6. Technical / Metrics Details */}
+                {selectedProgram.completionMetrics && (
+                  <View className={styles.metricsBox}>
+                    <Text className={styles.metricsBoxTitle}>Cold-Chain & Injection Metrics</Text>
+                    <Text className={styles.metricLine}>
+                      • Birds Vaccinated: {selectedProgram.completionMetrics.birdsVaccinated.toLocaleString()}
+                    </Text>
+                    <Text className={styles.metricLine}>
+                      • Dosage: {selectedProgram.completionMetrics.dosagePerBird}
+                    </Text>
+                    <Text className={styles.metricLine}>
+                      • Vaccine Batch: {selectedProgram.completionMetrics.batchNumber}
+                    </Text>
+                    <Text className={styles.metricLine}>
+                      • Cold Chain Temp: {selectedProgram.completionMetrics.coldChainTempCelsius}°C
+                    </Text>
+                    <Text className={styles.metricLine}>
+                      • Field Observations: {selectedProgram.completionMetrics.farmFlockObservations}
+                    </Text>
                   </View>
                 )}
               </ScrollView>

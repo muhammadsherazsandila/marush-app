@@ -110,7 +110,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) 
                 <LogOut size={17} color="#DC2626" strokeWidth={2.2} />
               </View>
               <View>
-                <Text className="text-sm font-bold text-red-700">Sign out of session</Text>
+                <Text className="text-sm font-bold text-red-700">Logout</Text>
                 <Text className="mt-0.5 text-[11px] text-red-600/80">You will need to sign in again to continue.</Text>
               </View>
             </View>
