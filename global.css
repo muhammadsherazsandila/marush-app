@@ -42,8 +42,8 @@ html, body, * {
 }
 
 ::selection {
-  background-color: #eaf4f1;
-  color: #004f42;
+  background-color: #e2f0eb;
+  color: #0b6259;
 }
 
 /* Emil Kowalski active tactile press utilities */

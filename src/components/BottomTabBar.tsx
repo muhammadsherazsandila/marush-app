@@ -21,7 +21,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
 
   return (
     <View
-      className="border-t border-black/[0.06] bg-white shadow-[0_-2px_12px_rgba(0,0,0,0.03)]"
+      className="border-t border-[#294651] bg-[#152A35] shadow-[0_-8px_24px_rgba(12,28,36,0.16)]"
       style={Platform.OS === 'web' ? ({ backdropFilter: 'blur(16px)', userSelect: 'none' } as any) : {}}
     >
       <View
@@ -36,9 +36,9 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
             <TouchableOpacity
               key={id}
               onPress={() => onTabChange(id)}
-              className={`min-h-[48px] min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded-2xl px-3.5 py-2 transition-all ${
+              className={`min-h-[50px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3.5 py-2 transition-all ${
                 active
-                  ? 'bg-marush-primary-subtle border border-marush-primary/15 shadow-sm'
+                  ? 'bg-[#2D766D] border border-[#4A9488] shadow-sm'
                   : 'bg-transparent border border-transparent'
               }`}
               accessibilityRole="tab"
@@ -63,7 +63,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
               </View>
               <Text
                 className={`text-[12px] tracking-tight ${
-                  active ? 'font-bold text-marush-primary' : 'font-medium text-slate-500'
+                  active ? 'font-bold text-white' : 'font-medium text-[#9CB2B7]'
                 }`}
               >
                 {label}

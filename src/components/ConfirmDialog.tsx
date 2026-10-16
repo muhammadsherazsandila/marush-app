@@ -169,52 +169,57 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         }}
       >
         <Animated.View
-          className="w-full max-w-[440px] rounded-3xl border border-black/[0.08] bg-white p-6 md:p-7 shadow-2xl"
+          className="w-full max-w-[420px] rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-2xl md:p-6"
           style={{
             transform: [{ scale: scaleAnim }],
             opacity: opacityAnim,
           }}
         >
-          {/* Top row: Icon well & variant badge */}
-          <View className="flex-row items-center justify-between">
-            <View
-              className={`h-14 w-14 items-center justify-center rounded-2xl border ${variantStyles.iconBox}`}
-            >
+          <View className="flex-row items-start gap-3.5">
+            <View className={`h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${variantStyles.iconBox}`}>
               {renderIcon()}
             </View>
-            <View className={`rounded-full border px-3 py-1 ${variantStyles.badge}`}>
-              <Text className="text-[10px] font-black uppercase tracking-wider">
-                {variant === 'danger' ? 'CONFIRM ACTION' : variant === 'warning' ? 'VERIFICATION REQUIRED' : 'CONFIRMATION'}
+            <View className="min-w-0 flex-1 pt-0.5">
+              <Text className={`text-[10px] font-black uppercase tracking-[1.5px] ${variantStyles.badge.split(' ')[0]}`}>
+                {variant === 'danger' ? 'Security action' : variant === 'warning' ? 'Verification required' : 'Confirmation'}
+              </Text>
+              <Text className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                {title}
               </Text>
             </View>
           </View>
 
-          {/* Title & Description */}
-          <Text className="mt-4 text-xl font-black tracking-tight text-slate-900">
-            {title}
-          </Text>
-          <Text className="mt-1.5 text-sm leading-relaxed text-slate-500">
+          <Text className="mt-5 text-sm leading-[21px] text-slate-500">
             {message}
           </Text>
 
-          {/* Action Button Row */}
-          <View className="mt-6 flex-row items-center justify-end gap-3">
+          <View className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50 px-3.5 py-3">
+            <Text className="text-[11px] leading-[17px] text-slate-500">
+              {variant === 'danger' ? 'You can sign in again at any time using your approved account.' : 'Review this action before continuing.'}
+            </Text>
+          </View>
+
+          <View className="mt-5 flex-row items-center gap-3">
             <TouchableOpacity
-              className="min-w-[100px] flex-1 items-center rounded-2xl border border-black/[0.08] bg-slate-50 px-4 py-3 active:scale-[0.97]"
+              className="min-w-0 flex-1 items-center rounded-xl border border-slate-200 bg-white px-3 py-3 active:scale-[0.97]"
               onPress={handleCancel}
               disabled={submitting}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={cancelText}
             >
-              <Text className="text-xs font-bold text-slate-600">{cancelText}</Text>
+              <Text className="text-xs font-bold text-slate-700">{cancelText}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              className={`min-w-[140px] flex-1 items-center rounded-2xl px-4 py-3 transition-all active:scale-[0.97] ${variantStyles.confirmBtn} ${
+              className={`min-w-0 flex-1 items-center rounded-xl px-3 py-3 transition-all active:scale-[0.97] ${variantStyles.confirmBtn} ${
                 submitting ? 'opacity-70' : ''
               }`}
               onPress={handleConfirm}
               disabled={submitting}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={confirmText}
             >
               {submitting ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />

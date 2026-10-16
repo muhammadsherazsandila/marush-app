@@ -1,6 +1,6 @@
 import './global.css';
 import React, { useState, useEffect } from 'react';
-import { Alert, AppState, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, AppState, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -22,14 +22,22 @@ import { EmployeeDashboard } from './src/screens/EmployeeDashboard';
 import { MarushLogo } from './src/components/MarushLogo';
 import { BottomTabBar, WorkspaceTab } from './src/components/BottomTabBar';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { Navbar } from './src/components/Navbar';
 import { ArrowLeft } from 'lucide-react-native';
 import { Colors } from './src/constants/colors';
 import { checkForAppUpdate } from './src/services/appUpdate';
+import { WorkspaceSidebar } from './src/components/WorkspaceSidebar';
+import { OperationsHome } from './src/screens/OperationsHome';
+import { ProgramDetail } from './src/screens/ProgramDetail';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
 
 export default function App() {
+  const { width } = useWindowDimensions();
   const [isLaunching, setIsLaunching] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(dataProvider.getCurrentUser());
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
+  const [selectedProgram, setSelectedProgram] = useState<import('./src/types').Program | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     // Restore the user profile synchronized with the current Supabase session.
@@ -238,6 +246,12 @@ export default function App() {
     });
   };
 
+  const handleTabChange = (tab: WorkspaceTab) => {
+    setShowNotifications(false);
+    setSelectedProgram(null);
+    setActiveTab(tab);
+  };
+
   const renderDashboardByRole = (tab: Exclude<WorkspaceTab, 'profile'>) => {
     if (!currentUser) return null;
 
@@ -281,8 +295,15 @@ export default function App() {
             onBackToLogin={handleLogout}
           />
         ) : (
-          <View className="flex-1">
-            {activeTab !== 'overview' && (
+          <View className="flex-1 flex-row bg-[#F4F6F7]">
+            {width >= 768 && <WorkspaceSidebar activeTab={activeTab} onTabChange={handleTabChange} onLogout={handleLogout} />}
+            <View className="min-w-0 flex-1">
+              <Navbar
+                title={showNotifications ? 'Notifications' : selectedProgram ? 'Program detail' : activeTab === 'profile' ? 'Account & security' : activeTab === 'programs' ? 'Programs' : 'Overview'}
+                onBack={showNotifications ? () => setShowNotifications(false) : selectedProgram ? () => setSelectedProgram(null) : undefined}
+                onNotifications={() => setShowNotifications(true)}
+              />
+              {activeTab !== 'overview' && width < 768 && (
               <View className="px-4 pt-3">
                 <TouchableOpacity
                   className="flex-row items-center gap-2 self-start rounded-full border border-marush-border bg-white px-3.5 py-2 shadow-sm"
@@ -296,11 +317,32 @@ export default function App() {
               </View>
             )}
             <View className="flex-1">
-              {activeTab === 'profile' ? (
+              {showNotifications ? (
+                <NotificationsScreen onBack={() => setShowNotifications(false)} />
+              ) : selectedProgram ? (
+                <ProgramDetail
+                  program={selectedProgram}
+                  onBack={() => {
+                    setSelectedProgram(null);
+                    setActiveTab('overview');
+                  }}
+                />
+              ) : activeTab === 'profile' ? (
                 <ProfileScreen user={currentUser} onLogout={handleLogout} />
+              ) : activeTab === 'overview' ? (
+                <OperationsHome
+                  currentUser={currentUser}
+                  onOpenPrograms={() => setActiveTab('programs')}
+                  onOpenProfile={() => setActiveTab('profile')}
+                  onOpenProgram={program => {
+                    setActiveTab('overview');
+                    setSelectedProgram(program);
+                  }}
+                />
               ) : renderDashboardByRole(activeTab)}
             </View>
-            <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+            {width < 768 && <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />}
+            </View>
           </View>
         )}
 

@@ -345,7 +345,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
               programs.map(prog => <TouchableOpacity key={prog.id} className={styles.programCard} onPress={() => setSelectedProgram(prog)}>
                 <View className={styles.progHeaderRow}><Text className={styles.progTitle}>{prog.programName}</Text><View className={styles.activeTag}><Text className={styles.activeTagText}>{prog.status.replace('_', ' ').toUpperCase()}</Text></View></View>
                 <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
-                <Text className={styles.progMeta}>Controller: {prog.controllerName || 'Unassigned'} Ã‚Â· {prog.flockSize.toLocaleString()} birds</Text>
+                <Text className={styles.progMeta}>Controller: {prog.controllerName || 'Unassigned'} · {prog.flockSize.toLocaleString()} birds</Text>
               </TouchableOpacity>)}
           </View>
         )}
@@ -356,9 +356,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
             <View className={styles.pageHeader}>
               <View className={styles.pageHeaderCopy}>
                 <Text className={styles.eyebrow}>ADMINISTRATION / OVERVIEW</Text>
-                <Text className={styles.sectionHeading}>Operations & Program Summary</Text>
+                <Text className={styles.sectionHeading}>Good morning, Admin</Text>
                 <Text className={styles.sectionDescription}>
-                  Monitor program delivery, team approvals, and staff access from one place.
+                  Here is what is happening across your vaccination operations today.
                 </Text>
               </View>
               <View className={styles.statusPill}>
@@ -463,7 +463,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
                     </View>
                     <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
                     <Text className={styles.progMeta}>
-                      Flock: {prog.flockSize.toLocaleString()} birds Ã¢â‚¬Â¢ Controller: {prog.controllerName}
+                      Flock: {prog.flockSize.toLocaleString()} birds · Controller: {prog.controllerName}
                     </Text>
                   </View>
                 ))
@@ -517,7 +517,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
               pendingAuditPrograms.map(prog => <TouchableOpacity key={prog.id} className={styles.programCard} onPress={() => setSelectedProgram(prog)}>
                 <View className={styles.progHeaderRow}><Text className={styles.progTitle}>{prog.programName}</Text><View className={styles.activeTag}><Text className={styles.activeTagText}>PENDING AUDIT</Text></View></View>
                 <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
-                <Text className={styles.progMeta}>Controller: {prog.controllerName || 'Unassigned'} Ã‚Â· Auditor: {prog.auditorName || 'Unassigned'}</Text>
+                <Text className={styles.progMeta}>Controller: {prog.controllerName || 'Unassigned'} · Auditor: {prog.auditorName || 'Unassigned'}</Text>
               </TouchableOpacity>)}
           </View>
         )}
@@ -556,7 +556,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
                   </View>
                   <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
                   <Text className={styles.progMeta}>
-                    Controller: {prog.controllerName} Ã¢â‚¬Â¢ Auditor: {prog.auditorName}
+                    Controller: {prog.controllerName} · Auditor: {prog.auditorName}
                   </Text>
                   {prog.auditScore ? (
                     <Text className={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
@@ -776,7 +776,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
                   <Text className={styles.approvalTitle}>{prog.programName}</Text>
                   <Text className={styles.progLocation}>{prog.hatcheryOrFarmName}</Text>
                   <Text className={styles.progMeta}>
-                    Controller: {prog.controllerName} Ã¢â‚¬Â¢ Team: {prog.teamMemberIds.length} members
+                    Controller: {prog.controllerName} · Team: {prog.teamMemberIds.length} members
                   </Text>
                   <TouchableOpacity
                     className={styles.approveTeamBtn}
@@ -1239,35 +1239,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeArea }) =>
 };
 
 const styles = {
-  container: 'flex-1 bg-slate-50',
-  navTabs: 'border-b border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]',
-  navInner: 'mx-auto w-full max-w-[1280px] flex-row items-center px-5 md:px-8',
+  container: 'flex-1 bg-[#F4F6F7]',
+  navTabs: 'border-b border-[#E4E8EA] bg-white',
+  navInner: 'mx-auto w-full max-w-[1440px] flex-row items-center px-5 py-1 md:px-10',
   tabsScroll: 'flex-grow items-center gap-5 py-0',
-  tabItem: 'border-b-2 border-transparent px-1 py-4',
-  activeTabItem: 'border-marush-primary',
-  tabItemText: 'text-[13px] font-semibold text-slate-500',
-  activeTabItemText: 'font-bold text-marush-primary',
-  refreshBtn: 'ml-3 justify-center rounded-2xl border border-black/[0.08] bg-white px-3.5 py-2 shadow-sm active:scale-[0.97]',
+  tabItem: 'border-b-2 border-transparent px-1 py-3.5',
+  activeTabItem: 'border-[#2D766D]',
+  tabItemText: 'text-[13px] font-semibold text-[#6D7D83]',
+  activeTabItemText: 'font-bold text-[#2D766D]',
+  refreshBtn: 'ml-3 justify-center rounded-xl border border-[#DCE4E7] bg-white px-3.5 py-2 active:scale-[0.97]',
   refreshBtnText: 'text-xs font-bold text-marush-primary',
   searchBar: 'mb-2 rounded-xl border border-black/[0.08] bg-slate-50/80 px-3.5 py-2.5 text-sm text-slate-800',
-  content: 'mx-auto w-full max-w-[1280px] p-4 md:p-8',
+  content: 'mx-auto w-full max-w-[1440px] p-5 md:p-10',
   tabSection: 'gap-4',
-  pageHeader: 'flex-row flex-wrap items-start justify-between gap-4',
+  pageHeader: 'flex-row flex-wrap items-start justify-between gap-4 border-b border-[#DCE4E7] pb-6',
   pageHeaderCopy: 'min-w-0 flex-1',
   eyebrow: 'mb-1 text-[10px] font-black uppercase tracking-[1.8px] text-marush-secondary-dark',
-  sectionHeading: 'text-2xl font-black tracking-tight text-slate-900',
+  sectionHeading: 'text-2xl font-black tracking-[-0.6px] text-[#162D38] md:text-3xl',
   sectionDescription: 'mt-1 max-w-[620px] text-xs md:text-sm leading-relaxed text-slate-500',
-  statusPill: 'flex-row items-center gap-1.5 rounded-full border border-black/[0.06] bg-white px-3 py-1.5 shadow-sm',
-  statusPillText: 'text-xs font-bold text-marush-primary',
+  statusPill: 'flex-row items-center gap-1.5 rounded-lg border border-[#CFE7DE] bg-[#E9F6F0] px-3 py-1.5',
+  statusPillText: 'text-xs font-bold text-[#2D766D]',
   subHeading: 'mb-2 text-sm font-bold text-slate-900',
-  metricsGrid: 'mt-2 flex-row flex-wrap gap-3',
-  metricCard: 'min-w-[190px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]',
+  metricsGrid: 'mt-2 flex-row flex-wrap gap-4',
+  metricCard: 'min-w-[210px] flex-1 rounded-xl border border-[#DCE4E7] bg-white p-5 shadow-[0_2px_8px_rgba(18,38,48,0.035)]',
   metricCardHeader: 'flex-row items-center justify-between gap-2',
   metricTrend: 'text-[10px] font-bold uppercase tracking-wider text-slate-400',
   metricLabel: 'text-[10px] font-black uppercase tracking-wider text-slate-400',
   metricValue: 'mt-2 text-3xl font-black tracking-tight text-slate-900',
   metricSupporting: 'mt-0.5 text-xs text-slate-500',
-  recentSection: 'mt-4 rounded-3xl border border-black/[0.07] bg-white p-5 md:p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]',
+  recentSection: 'mt-5 rounded-xl border border-[#DCE4E7] bg-white p-5 md:p-6 shadow-[0_2px_8px_rgba(18,38,48,0.035)]',
   sectionCaption: 'text-xs text-slate-500',
   countCaption: 'rounded-full bg-slate-100 border border-black/[0.05] px-2.5 py-1 text-[11px] font-bold text-marush-primary',
   requestSummary: 'flex-row items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4',
