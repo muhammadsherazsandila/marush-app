@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Toast from 'react-native-toast-message';
-import { Activity, Bird, CircleCheck, ClipboardList, RefreshCw, Syringe, Thermometer } from 'lucide-react-native';
+import { Activity, Bird, CircleCheck, ClipboardList, RefreshCw, Syringe, Thermometer, MapPin, CalendarDays } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -54,45 +54,59 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
     <ScrollView className="flex-1 bg-marush-background">
       <View className="flex-grow p-4 md:p-8">
       <View className="mx-auto w-full max-w-[1200px] gap-3">
-        {activeArea === 'overview' && <View className="flex-row flex-wrap items-center justify-between gap-3.5 rounded-lg border border-marush-border bg-white p-[22px]">
-          <View>
-            <Text className="text-[11px] font-bold uppercase text-marush-muted-light">Overview</Text>
-            <Text className="mt-0.5 text-[22px] font-extrabold text-marush-primary">{currentUser.fullName}</Text>
-            <Text className="mt-0.5 text-xs font-semibold text-marush-muted">{currentUser.employeeCode || 'MRSH-EMP'}</Text>
+        {activeArea === 'overview' && <View className="overflow-hidden rounded-2xl border border-marush-border bg-white shadow-sm">
+          <View className="flex-row flex-wrap items-center justify-between gap-4 bg-marush-primary px-5 py-5 md:px-7">
+          <View className="min-w-0 flex-1">
+            <Text className="text-[10px] font-extrabold uppercase tracking-[1.6px] text-emerald-100">Field operations</Text>
+            <Text className="mt-1 text-2xl font-extrabold text-white">{currentUser.fullName}</Text>
+            <Text className="mt-1 text-xs font-medium text-emerald-100">{currentUser.employeeCode || 'MRSH-EMP'} · Team member workspace</Text>
           </View>
           <View className="items-end gap-2">
-            <View className="rounded-lg bg-marush-subtle px-2.5 py-1.5">
-              <Text className="text-[10px] font-extrabold text-marush-primary">{currentUser.role.replace('_', ' ').toUpperCase()}</Text>
+            <View className="rounded-full bg-white/15 px-3 py-1.5">
+              <Text className="text-[10px] font-extrabold uppercase tracking-wide text-white">Active account</Text>
             </View>
-            <TouchableOpacity className="rounded-md border border-marush-border bg-white px-2.5 py-1.5" onPress={refreshData} disabled={loading}>
+            <TouchableOpacity className="rounded-xl bg-white/10 px-3 py-2" onPress={refreshData} disabled={loading}>
               {loading ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <IconLabel icon={RefreshCw} label="Refresh" className="text-[11px] font-semibold text-marush-primary" />
+                <IconLabel icon={RefreshCw} label="Refresh data" color="#FFFFFF" className="text-[11px] font-semibold text-white" />
               )}
             </TouchableOpacity>
+          </View>
+          </View>
+          <View className="flex-row flex-wrap gap-x-8 gap-y-3 border-t border-marush-border px-5 py-3.5 md:px-7">
+            <Text className="text-xs font-semibold text-marush-muted">Assigned programs: {attendedPrograms.length}</Text>
+            <Text className="text-xs font-semibold text-marush-muted">Last synced just now</Text>
           </View>
         </View>}
 
         {/* Overview Tab Stats */}
         {activeArea === 'overview' && <>
-        <IconLabel icon={ClipboardList} label="Program summary" size={18} className="text-xl font-bold text-marush-text" />
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-[10px] font-extrabold uppercase tracking-[1.5px] text-marush-secondary-dark">Workspace overview</Text>
+            <Text className="mt-1 text-xl font-extrabold text-marush-text">Program summary</Text>
+          </View>
+          <View className="rounded-full bg-marush-subtle px-3 py-1.5">
+            <Text className="text-[10px] font-bold text-marush-primary">LIVE</Text>
+          </View>
+        </View>
         <View className="flex-row flex-wrap gap-2.5">
-          <View className="min-w-[130px] flex-1 rounded-[10px] border border-l-4 border-marush-border border-l-marush-primary bg-white p-3.5">
+          <View className="min-w-[130px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
             <IconLabel icon={ClipboardList} label="Total programs" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
             <Text className="mt-1 text-2xl font-extrabold text-marush-primary">
               {attendedPrograms.length}
             </Text>
           </View>
 
-          <View className="min-w-[130px] flex-1 rounded-[10px] border border-l-4 border-marush-border border-l-marush-secondary bg-white p-3.5">
+          <View className="min-w-[130px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
             <IconLabel icon={Activity} label="Active" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
             <Text className="mt-1 text-2xl font-extrabold text-marush-secondary">
               {activeCount}
             </Text>
           </View>
 
-          <View className="min-w-[130px] flex-1 rounded-[10px] border border-l-4 border-marush-border border-l-marush-primary-light bg-white p-3.5">
+          <View className="min-w-[130px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
             <IconLabel icon={CircleCheck} label="Completed" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
             <Text className="mt-1 text-2xl font-extrabold text-marush-primary-light">
               {completedCount}
@@ -103,10 +117,14 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
 
         {/* Attended Programs List with Role in that Program */}
         {activeArea === 'programs' && <>
-        <IconLabel icon={ClipboardList} label="My programs" size={18} className="mt-2 text-xl font-bold text-marush-text" />
+        <View className="mb-1">
+          <Text className="text-[10px] font-extrabold uppercase tracking-[1.5px] text-marush-secondary-dark">Assignments</Text>
+          <Text className="mt-1 text-xl font-extrabold text-marush-text">My programs</Text>
+          <Text className="mt-1 text-xs text-marush-muted">Review your assigned field work, schedules, and audit outcomes.</Text>
+        </View>
 
         {attendedPrograms.length === 0 ? (
-          <View className="items-center rounded-[10px] border border-marush-border bg-white p-6">
+          <View className="items-center rounded-2xl border border-dashed border-marush-border bg-white p-8">
             <Text className="text-center text-[13px] leading-[18px] text-marush-muted-light">
               No programs assigned.
             </Text>
@@ -115,7 +133,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
           attendedPrograms.map(prog => {
             const isController = prog.controllerId === currentUser.id;
             return (
-              <View key={prog.id} className="mb-2 gap-1 rounded-xl border border-marush-border bg-white p-4">
+              <View key={prog.id} className="mb-3 gap-2 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
                 <View className="flex-row items-center justify-between gap-2">
                   <Text className="flex-1 text-[15px] font-bold text-marush-text">{prog.programName}</Text>
                   <View
@@ -129,7 +147,10 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
                   </View>
                 </View>
 
-                <Text className="text-[13px] font-medium text-marush-muted">{prog.hatcheryOrFarmName}</Text>
+                <View className="flex-row items-center gap-1.5">
+                  <MapPin size={14} color={Colors.primary} />
+                  <Text className="text-[13px] font-semibold text-marush-muted">{prog.hatcheryOrFarmName}</Text>
+                </View>
 
                 <View className="mt-1 flex-row flex-wrap gap-x-4 gap-y-1">
                   <Text className="text-xs text-marush-muted">
@@ -140,12 +161,15 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
                   </Text>
                 </View>
 
-                <Text className="mt-0.5 text-[11px] text-marush-muted-light">
+                <View className="mt-1 flex-row items-center gap-1.5">
+                  <CalendarDays size={13} color={Colors.textMuted} />
+                  <Text className="text-[11px] text-marush-muted-light">
                   Scheduled: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
-                </Text>
+                  </Text>
+                </View>
 
                 {prog.completionMetrics && (
-                  <View className="mt-2 gap-0.5 rounded-lg bg-marush-subtle p-2.5">
+                  <View className="mt-2 gap-1 rounded-xl border border-marush-border bg-marush-subtle p-3">
                     <Text className="text-[11px] font-bold text-marush-primary">Vaccination & Cold-Chain Records:</Text>
                     <Text className="text-[11px] text-marush-muted">
                       Birds Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()}
@@ -180,4 +204,3 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
     </ScrollView>
   );
 };
-
