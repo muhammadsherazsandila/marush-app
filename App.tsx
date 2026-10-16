@@ -1,6 +1,6 @@
 import './global.css';
 import React, { useState, useEffect } from 'react';
-import { Alert, AppState, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, AppState, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -12,6 +12,7 @@ WebBrowser.maybeCompleteAuthSession();
 import { UserProfile } from './src/types';
 import { dataProvider, getSupabaseClient, isSupabaseConfigured } from './src/services';
 
+import { Navbar } from './src/components/Navbar';
 import { LaunchScreen } from './src/screens/LaunchScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { PendingApprovalScreen } from './src/screens/PendingApprovalScreen';
@@ -22,8 +23,6 @@ import { EmployeeDashboard } from './src/screens/EmployeeDashboard';
 import { MarushLogo } from './src/components/MarushLogo';
 import { BottomTabBar, WorkspaceTab } from './src/components/BottomTabBar';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { ArrowLeft } from 'lucide-react-native';
-import { Colors } from './src/constants/colors';
 import { checkForAppUpdate } from './src/services/appUpdate';
 
 export default function App() {
@@ -282,19 +281,7 @@ export default function App() {
           />
         ) : (
           <View className="flex-1">
-            {activeTab !== 'overview' && (
-              <View className="px-4 pt-3">
-                <TouchableOpacity
-                  className="flex-row items-center gap-2 self-start rounded-full border border-marush-border bg-white px-3.5 py-2 shadow-sm"
-                  onPress={() => setActiveTab('overview')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to overview"
-                >
-                  <ArrowLeft size={17} color={Colors.primary} />
-                  <Text className="text-xs font-bold text-marush-primary">Overview</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <Navbar />
             <View className="flex-1">
               {activeTab === 'profile' ? (
                 <ProfileScreen user={currentUser} onLogout={handleLogout} />
