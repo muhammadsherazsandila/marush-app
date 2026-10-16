@@ -50,6 +50,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@babel/plugin-transform-react-jsx": "7.27.1",
+    "@expo/config-plugins": "~57.0.10",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "@types/react": "~19.2.18",

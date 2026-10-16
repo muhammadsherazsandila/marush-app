@@ -118,8 +118,19 @@ The APK uses the `marushapp://auth/callback` deep link. Add that URL to Supabase
 
 Android builds also check the latest GitHub Release on startup. To publish an update, push a tag such as `android-v1.0.1`; the workflow publishes the APK as a release asset. Existing installations will prompt the user to download the APK. Android still requires the user to confirm the installation, and the APK must be signed with the same key as the installed version for an in-place update.
 
+### Android signing setup
+
+The Android workflow signs release APKs using a persistent keystore stored in GitHub Actions secrets. Generate the keystore once with JDK `keytool`, then add these repository secrets under **Settings → Secrets and variables → Actions**:
+
+- `ANDROID_KEYSTORE_BASE64`: base64-encoded `.keystore` file
+- `ANDROID_KEYSTORE_PASSWORD`: keystore password
+- `ANDROID_KEY_ALIAS`: key alias
+- `ANDROID_KEY_PASSWORD`: key password
+
+Back up the keystore and passwords securely. Losing the keystore prevents future APKs from updating existing installations. The workflow refuses to build if any signing secret is missing.
+
 ### Release targets
-GitHub tagged releases contain a production **web export**. The Android APK is built by the separate manual/tagged workflow and requires only the repository secrets listed above. The generated APK is unsigned for internal testing; production distribution requires configuring Android signing credentials in the workflow.
+GitHub tagged releases contain a production **web export**. The Android APK is built by the separate manual/tagged workflow and requires the repository secrets listed above for signed in-place updates.
 
 ---
 
