@@ -7,7 +7,7 @@ on:
       - 'android-v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -71,3 +71,13 @@ jobs:
           name: marush-android-apk-${{ github.run_number }}
           path: marush-*.apk
           retention-days: 14
+
+      - name: Publish Android release
+        if: startsWith(github.ref, 'refs/tags/android-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "marush-${GITHUB_REF_NAME}.apk" \
+            --title "Marush Android ${GITHUB_REF_NAME}" \
+            --notes "Install this APK to update the Marush Android app."

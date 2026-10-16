@@ -116,6 +116,8 @@ Run it from **GitHub → Actions → Build Android APK → Run workflow**. Downl
 
 The APK uses the `marushapp://auth/callback` deep link. Add that URL to Supabase Auth's allowed redirect URLs before testing Google sign-in. Expo Go's `exp://...` callback is only for local development.
 
+Android builds also check the latest GitHub Release on startup. To publish an update, push a tag such as `android-v1.0.1`; the workflow publishes the APK as a release asset. Existing installations will prompt the user to download the APK. Android still requires the user to confirm the installation, and the APK must be signed with the same key as the installed version for an in-place update.
+
 ### Release targets
 GitHub tagged releases contain a production **web export**. The Android APK is built by the separate manual/tagged workflow and requires only the repository secrets listed above. The generated APK is unsigned for internal testing; production distribution requires configuring Android signing credentials in the workflow.
 

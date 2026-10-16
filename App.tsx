@@ -1,6 +1,6 @@
 import './global.css';
 import React, { useState, useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -23,6 +23,7 @@ import { EmployeeDashboard } from './src/screens/EmployeeDashboard';
 import { MarushLogo } from './src/components/MarushLogo';
 import { BottomTabBar, WorkspaceTab } from './src/components/BottomTabBar';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { checkForAppUpdate } from './src/services/appUpdate';
 
 export default function App() {
   const [isLaunching, setIsLaunching] = useState(true);
@@ -156,6 +157,35 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    checkForAppUpdate()
+      .then((update) => {
+        if (!update) return;
+
+        Alert.alert(
+          'Update available',
+          `Marush ${update.version} is ready to download.\n\n${update.notes}`,
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Download',
+              onPress: () => {
+                Linking.openURL(update.downloadUrl).catch(() => {
+                  Alert.alert(
+                    'Unable to open download',
+                    `Please download the update from ${update.releaseUrl}.`,
+                  );
+                });
+              },
+            },
+          ],
+        );
+      })
+      .catch((error) => {
+        console.warn('[App Update] Could not check for updates:', error);
+      });
+  }, []);
+
   const handleLogout = async () => {
     await dataProvider.signOut();
     setCurrentUser(null);
@@ -226,4 +256,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
