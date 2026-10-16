@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   Check,
   ChevronDown,
   ChevronUp,
@@ -13,8 +12,14 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
+import Svg, {
+  Defs,
+  Ellipse,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Stop,
+} from "react-native-svg";
 import Toast from "react-native-toast-message";
 import { MarushLogo } from "../components/MarushLogo";
 import { Colors } from "../constants/colors";
@@ -28,44 +33,41 @@ interface AuthScreenProps {
 
 type RequestedDesignation = Exclude<UserRole, "admin">;
 
-const DESIGNATIONS: {
-  value: RequestedDesignation;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "employee",
-    label: "Field Specialist",
-    description: "Vaccination execution & monitoring",
-  },
-  {
-    value: "program_controller",
-    label: "Program Controller",
-    description: "Operations setup & oversight",
-  },
-  {
-    value: "program_auditor",
-    label: "Program Auditor",
-    description: "Quality compliance & sign-off",
-  },
+const DESIGNATIONS: { value: RequestedDesignation; label: string }[] = [
+  { value: "employee", label: "Employee" },
+  { value: "program_controller", label: "Program Controller" },
+  { value: "program_auditor", label: "Program Auditor" },
 ];
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
   onLoginSuccess,
   onRegisteredPending,
 }) => {
-  const { width } = useWindowDimensions();
   const [designation, setDesignation] =
     useState<RequestedDesignation>("employee");
   const [designationOpen, setDesignationOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const isWide = width >= 960;
-
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const { user } = await dataProvider.signInWithGoogle(designation);
+      const { user, error } = await dataProvider.signInWithGoogle(designation);
+      if (error) {
+        const isLocalhostPreviewError = error.startsWith(
+          "Mobile browser preview is on localhost.",
+        );
+        Toast.show({
+          type: "error",
+          text1: isLocalhostPreviewError
+            ? "Open the app in Expo Go"
+            : "Google sign-in failed",
+          text2: isLocalhostPreviewError
+            ? "Use the LAN QR code, or sign in from the deployed HTTPS app."
+            : error,
+        });
+        setLoading(false);
+        return;
+      }
 
       const authenticatedUser = user || dataProvider.getCurrentUser();
       if (!authenticatedUser) {
@@ -112,130 +114,119 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
 
-  const selectedDesignationObj = DESIGNATIONS.find(
-    (option) => option.value === designation,
-  );
-
   return (
     <ScrollView
-      className="flex-1 bg-marush-background"
-      contentContainerClassName="flex-grow items-center justify-center p-4 md:p-8"
+      className="flex-1 bg-[#e9f7f5]"
+      contentContainerClassName="flex-grow"
       keyboardShouldPersistTaps="handled"
     >
-      <View
-        className={`w-full max-w-[1040px] flex-grow justify-center self-center overflow-hidden rounded-3xl border border-marush-border bg-white shadow-xl ${
-          isWide
-            ? "flex-row items-stretch min-h-[580px]"
-            : "items-center p-6 md:p-10"
-        }`}
-      >
-        {/* Left Hero Panel (Desktop) */}
-        {isWide && (
-          <View className="relative w-[45%] flex-col justify-between overflow-hidden bg-marush-primary p-10">
-            {/* Ambient background glows */}
-            <View className="absolute -top-20 -left-20 h-64 w-64 rounded-full bg-marush-primary-light/40 blur-2xl" />
-            <View className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-marush-secondary/20 blur-3xl" />
-
-            {/* Top Brand section */}
-            <View className="z-10">
-              <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/10 border border-white/20 shadow-sm backdrop-blur-md">
-                <MarushLogo size="sm" variant="mark" framed={false} />
-              </View>
-              <Text className="mt-6 text-[32px] font-black tracking-[2px] text-white">
-                MARUSH
-              </Text>
-              <View className="mt-2 flex-row items-center gap-2">
-                <View className="h-1.5 w-1.5 rounded-full bg-marush-secondary" />
-                <Text className="text-xs font-semibold uppercase tracking-wider text-marush-secondary-light">
-                  Exclusive Ceva Animal Health Partner
-                </Text>
-              </View>
-            </View>
-
-            {/* Center value prop */}
-            <View className="z-10 my-8">
-              <Text className="text-[20px] font-bold leading-tight text-white">
-                Precision Poultry Monitoring & Vaccination
-              </Text>
-              <Text className="mt-3 text-[13px] leading-relaxed text-marush-primary-subtle/80">
-                Pakistan’s premier field enterprise management system for
-                automated hatchery cold-chain verification and flock vitality.
-              </Text>
-            </View>
-
-            {/* Bottom Security indicator */}
-            <View className="z-10 flex-row items-center gap-2 rounded-xl bg-white/10 px-4 py-3 border border-white/10">
-              <ShieldCheck size={18} color={Colors.secondaryLight} />
-              <View>
-                <Text className="text-[11px] font-bold text-white">
-                  Authorized Access Only
-                </Text>
-                <Text className="text-[10px] text-marush-primary-subtle/70">
-                  Encrypted Enterprise SSO
-                </Text>
-              </View>
-            </View>
+      <View className="flex-1 bg-[#e9f7f5]">
+        <View className="h-[280px] overflow-hidden bg-marush-primary">
+          <Svg
+            width="100%"
+            height="100%"
+            viewBox="0 0 460 280"
+            preserveAspectRatio="xMidYMid slice"
+          >
+            <Defs>
+              <SvgLinearGradient id="leafBackground" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0" stopColor={Colors.primaryLight} />
+                <Stop offset="1" stopColor={Colors.primaryDark} />
+              </SvgLinearGradient>
+              <SvgLinearGradient id="leafHighlight" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0" stopColor={Colors.secondary} stopOpacity="0.75" />
+                <Stop offset="1" stopColor={Colors.primary} stopOpacity="0.15" />
+              </SvgLinearGradient>
+            </Defs>
+            <Path d="M0 0h460v280H0z" fill="url(#leafBackground)" />
+            <Ellipse
+              cx="66"
+              cy="44"
+              rx="118"
+              ry="52"
+              fill="url(#leafHighlight)"
+              rotation="-28"
+              origin="66, 44"
+            />
+            <Ellipse
+              cx="386"
+              cy="82"
+              rx="106"
+              ry="48"
+              fill={Colors.secondaryDark}
+              opacity="0.75"
+              rotation="-25"
+              origin="386, 82"
+            />
+            <Ellipse
+              cx="260"
+              cy="194"
+              rx="148"
+              ry="60"
+              fill={Colors.primary}
+              opacity="0.85"
+              rotation="-20"
+              origin="260, 194"
+            />
+            <Path
+              d="M-32 126C58 34 131 27 194 19M-20 145C68 71 128 58 193 48M-2 167c73-65 130-86 196-91M331 19c-2 77 26 120 91 174M365 10c-5 81 22 126 73 166M403 24c-2 69 15 111 50 145"
+              stroke={Colors.secondaryLight}
+              strokeOpacity="0.33"
+              strokeWidth="2"
+              fill="none"
+            />
+            <Path
+              d="M0 246C78 203 144 179 229 174C321 169 383 184 460 146V280H0Z"
+              fill="#e9f7f5"
+            />
+          </Svg>
+          <View className="absolute left-6 top-8">
+            <MarushLogo size="sm" variant="mark" />
           </View>
-        )}
+        </View>
 
-        {/* Right Form Container */}
-        <View
-          className={`flex-1 justify-center gap-10 ${
-            isWide ? "px-12 py-6" : "w-full max-w-[420px]"
-          }`}
-        >
-          {!isWide && (
-            <View className="mb-6 items-center">
-              <MarushLogo
-                size="lg"
-                variant="full"
-                framed={false}
-                showSubtitle={false}
-              />
-            </View>
-          )}
-
-          <View className="mb-6">
-            <Text className="text-2xl md:text-3xl font-extrabold tracking-tight text-marush-text">
+        <View className="mx-auto w-full max-w-[460px] px-6 pb-8 pt-10">
+          <View className="items-center">
+            <Text className="text-[28px] font-extrabold tracking-tight text-marush-primary">
               Welcome back
             </Text>
-            <Text className="mt-1.5 text-sm text-marush-muted">
-              Select your role and authenticate with your corporate Google
-              workspace account.
+            <Text className="mt-1 text-sm font-medium text-marush-muted">
+              Sign in to your Marush account
             </Text>
+            <View className="mt-3 flex-row items-center gap-1.5">
+              <ShieldCheck size={13} color={Colors.primary} />
+              <Text className="text-[10px] font-bold uppercase tracking-[1.4px] text-marush-primary">
+                Secure work access
+              </Text>
+            </View>
           </View>
 
-          <View className="gap-8">
-            {/* Designation Selector */}
+          <View className="mt-7 gap-4">
             <View
               className="gap-2"
               style={
                 designationOpen
-                  ? { position: "relative", zIndex: 30, elevation: 12 }
+                  ? { position: "relative", zIndex: 10, elevation: 8 }
                   : undefined
               }
             >
-              <Text className="text-xs font-bold uppercase tracking-wider text-marush-muted">
-                Assigned Designation
+              <Text className="text-sm font-bold text-marush-text">
+                Designation
               </Text>
-
               <TouchableOpacity
-                className="h-14 flex-row items-center justify-between rounded-xl border border-marush-border bg-marush-background px-4 hover:border-marush-primary transition-colors shadow-sm"
+                className="h-14 flex-row items-center justify-between rounded-xl border border-[#bce5df] bg-[#e9f7f5] px-4"
                 onPress={() => setDesignationOpen((open) => !open)}
                 disabled={loading}
                 accessibilityRole="button"
-                accessibilityLabel={`Designation: ${selectedDesignationObj?.label}`}
+                accessibilityLabel={`Designation: ${DESIGNATIONS.find((option) => option.value === designation)?.label}`}
                 accessibilityState={{ expanded: designationOpen }}
-                activeOpacity={0.8}
               >
-                <View>
-                  <Text className="text-sm font-bold text-marush-text">
-                    {selectedDesignationObj?.label}
-                  </Text>
-                  <Text className="text-[11px] text-marush-muted">
-                    {selectedDesignationObj?.description}
-                  </Text>
-                </View>
+                <Text className="text-base font-semibold text-marush-text">
+                  {
+                    DESIGNATIONS.find((option) => option.value === designation)
+                      ?.label
+                  }
+                </Text>
                 {designationOpen ? (
                   <ChevronUp size={18} color={Colors.primary} />
                 ) : (
@@ -245,24 +236,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
               {designationOpen && (
                 <View
-                  className="overflow-hidden rounded-xl border border-marush-border bg-white shadow-xl"
+                  className="overflow-hidden rounded-xl border border-[#bce5df] bg-white shadow-md"
                   style={{
                     position: "absolute",
-                    top: 76,
+                    top: 62,
                     left: 0,
                     right: 0,
-                    zIndex: 40,
-                    elevation: 16,
+                    zIndex: 20,
+                    elevation: 8,
                   }}
                 >
                   {DESIGNATIONS.map((option) => (
                     <TouchableOpacity
                       key={option.value}
-                      className={`flex-row items-center justify-between border-b border-marush-border/60 p-3.5 ${
-                        designation === option.value
-                          ? "bg-marush-primary-subtle/80"
-                          : "hover:bg-marush-subtle"
-                      }`}
+                      className={`min-h-11 flex-row items-center justify-between border-b border-marush-border px-3.5 ${designation === option.value ? "bg-[#e9f7f5]" : ""}`}
                       onPress={() => {
                         setDesignation(option.value);
                         setDesignationOpen(false);
@@ -272,24 +259,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         selected: designation === option.value,
                       }}
                     >
-                      <View>
-                        <Text
-                          className={`text-sm ${
-                            designation === option.value
-                              ? "font-extrabold text-marush-primary"
-                              : "font-semibold text-marush-text"
-                          }`}
-                        >
-                          {option.label}
-                        </Text>
-                        <Text className="text-[11px] text-marush-muted">
-                          {option.description}
-                        </Text>
-                      </View>
+                      <Text
+                        className={`text-sm ${designation === option.value ? "font-bold text-marush-primary" : "text-marush-muted"}`}
+                      >
+                        {option.label}
+                      </Text>
                       {designation === option.value && (
-                        <View className="h-6 w-6 items-center justify-center rounded-full bg-marush-primary">
-                          <Check size={13} color="#FFFFFF" strokeWidth={3} />
-                        </View>
+                        <Check size={16} color={Colors.primary} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -297,39 +273,38 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               )}
             </View>
 
-            {/* Google Sign In Action */}
+            <Text className="text-sm leading-5 text-marush-muted">
+              Designation is a request. New accounts need approval.
+            </Text>
+
             <TouchableOpacity
-              className={`h-14 flex-row items-center justify-center gap-3 rounded-xl border border-marush-border bg-white px-5 shadow-sm active:bg-marush-subtle hover:border-marush-primary transition-all ${
-                loading ? "opacity-75" : ""
-              }`}
+              className={`min-h-14 items-center justify-center rounded-xl bg-marush-primary px-4 shadow-sm ${loading ? "opacity-70" : ""}`}
               onPress={handleGoogleSignIn}
               disabled={loading}
               activeOpacity={0.8}
               accessibilityRole="button"
             >
               {loading ? (
-                <View className="flex-row items-center gap-2">
-                  <ActivityIndicator color={Colors.primary} size="small" />
-                  <Text className="text-sm font-semibold text-marush-primary">
-                    Connecting to Google…
-                  </Text>
-                </View>
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <>
+                <View className="flex-row items-center justify-center gap-2.5">
                   <Image
                     source={require("../../assets/google-g-logo.png")}
-                    style={{ width: 22, height: 22 }}
+                    className="h-5 w-5"
+                    style={{ width: 20, height: 20 }}
                     resizeMode="contain"
                     accessible={false}
                   />
-                  <Text className="text-[15px] font-bold text-marush-text">
+                  <Text className="text-base font-bold text-white">
                     Continue with Google
                   </Text>
-                  <ArrowRight size={16} color={Colors.textMuted} />
-                </>
+                </View>
               )}
             </TouchableOpacity>
           </View>
+          <Text className="mt-5 text-center text-xs leading-5 text-marush-muted">
+            New accounts are reviewed by a Marush administrator after sign-in.
+          </Text>
         </View>
       </View>
     </ScrollView>
