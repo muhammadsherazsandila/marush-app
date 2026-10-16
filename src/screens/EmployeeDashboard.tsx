@@ -81,7 +81,6 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
         </View>}
 
         {/* Overview Tab Stats */}
-        {activeArea === 'overview' && <>
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-[10px] font-extrabold uppercase tracking-[1.5px] text-marush-secondary-dark">Workspace overview</Text>
@@ -92,28 +91,27 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUse
           </View>
         </View>
         <View className="flex-row flex-wrap gap-2.5">
-          <View className="min-w-[130px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
+          <View className="min-w-[145px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
             <IconLabel icon={ClipboardList} label="Total programs" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
             <Text className="mt-1 text-2xl font-extrabold text-marush-primary">
               {attendedPrograms.length}
             </Text>
           </View>
 
-          <View className="min-w-[130px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
+          <View className="min-w-[145px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
             <IconLabel icon={Activity} label="Active" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
             <Text className="mt-1 text-2xl font-extrabold text-marush-secondary">
               {activeCount}
             </Text>
           </View>
 
-          <View className="min-w-[130px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
+          <View className="min-w-[145px] flex-1 rounded-2xl border border-marush-border bg-white p-4 shadow-sm">
             <IconLabel icon={CircleCheck} label="Completed" color={Colors.textSecondary} size={14} className="text-[10px] font-bold uppercase text-marush-muted-light" />
             <Text className="mt-1 text-2xl font-extrabold text-marush-primary-light">
               {completedCount}
             </Text>
           </View>
         </View>
-        </>}
 
         {/* Attended Programs List with Role in that Program */}
         {activeArea === 'programs' && <>
