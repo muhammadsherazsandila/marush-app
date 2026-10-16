@@ -289,145 +289,256 @@ export const ProgramControllerDashboard: React.FC<ProgramControllerDashboardProp
   };
 
   return (
-    <View className={styles.container}>
-      {/* Tab Switcher & Refresh */}
-      {activeArea === 'programs' && <View className={styles.tabBar}>
-        <View className={styles.tabGroup}>
+    <View className="flex-1 bg-slate-50">
+      {/* Sub-header navigation row matching AdminDashboard */}
+      <View className="border-b border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+        <View className="mx-auto w-full max-w-[1280px] flex-row items-center justify-between px-5 md:px-8 py-0">
+          <View className="flex-row items-center gap-5">
+            <TouchableOpacity
+              className={`border-b-2 px-1 py-4 ${activeTab === 'my_programs' ? 'border-marush-primary' : 'border-transparent'}`}
+              onPress={() => setActiveTab('my_programs')}
+            >
+              <Text className={`text-[13px] ${activeTab === 'my_programs' ? 'font-bold text-marush-primary' : 'font-semibold text-slate-500'}`}>
+                My Programs ({myPrograms.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className={`border-b-2 px-1 py-4 ${activeTab === 'initiate' ? 'border-marush-primary' : 'border-transparent'}`}
+              onPress={() => {
+                refreshData();
+                setActiveTab('initiate');
+              }}
+            >
+              <View className="flex-row items-center gap-1.5">
+                <Plus size={14} color={activeTab === 'initiate' ? Colors.primary : Colors.textMuted} strokeWidth={2.5} />
+                <Text className={`text-[13px] ${activeTab === 'initiate' ? 'font-bold text-marush-primary' : 'font-semibold text-slate-500'}`}>
+                  Initiate Program
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            className={`${styles.tabBtn} ${activeTab === 'my_programs' ? styles.tabBtnActive : ''}`}
-            onPress={() => setActiveTab('my_programs')}
+            className="flex-row items-center gap-1.5 rounded-2xl border border-black/[0.08] bg-white px-3.5 py-2 shadow-sm transition-all active:scale-[0.97]"
+            onPress={refreshData}
+            disabled={loading}
           >
-            <Text className={`${styles.tabBtnText} ${activeTab === 'my_programs' ? styles.tabBtnTextActive : ''}`}>
-              My Programs ({myPrograms.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`${styles.tabBtn} ${activeTab === 'initiate' ? styles.tabBtnActive : ''}`}
-            onPress={() => {
-              refreshData();
-              setActiveTab('initiate');
-            }}
-          >
-            <View className="flex-row items-center gap-1">
-              <Plus size={14} color={activeTab === 'initiate' ? Colors.primary : Colors.textSecondary} />
-              <Text className={`${styles.tabBtnText} ${activeTab === 'initiate' ? styles.tabBtnTextActive : ''}`}>Initiate Program</Text>
-            </View>
+            {loading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <>
+                <RefreshCw size={14} color={Colors.primary} strokeWidth={2.4} />
+                <Text className="text-xs font-bold text-marush-primary">Refresh</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
+      </View>
 
-        <TouchableOpacity className={styles.refreshBtn} onPress={refreshData} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
-          ) : (
-            <View className="flex-row items-center gap-1.5">
-              <RefreshCw size={15} color={Colors.primary} />
-              <Text className={styles.refreshBtnText}>Refresh</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>}
-
-      {activeArea === 'programs' && activeTab === 'my_programs' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName={styles.filterRow}>
-        {([
-          ['all', 'All'],
-          ['active', 'Active'],
-          ['pending_approval', 'Awaiting approval'],
-          ['pending_audit', 'Pending audit'],
-          ['completed', 'Completed'],
-        ] as const).map(([filter, label]) => (
-          <TouchableOpacity key={filter} className={`${styles.filterChip} ${programFilter === filter ? styles.filterChipActive : ''}`} onPress={() => setProgramFilter(filter)}>
-            <Text className={`${styles.filterChipText} ${programFilter === filter ? styles.filterChipTextActive : ''}`}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>}
-
-      <ScrollView contentContainerClassName={styles.content}>
-        {activeTab === 'my_programs' ? (
-          <View className={styles.section}>
-            <Text className={styles.sectionTitle}>{activeArea === 'overview' ? 'Your operations at a glance' : 'Your programs'}</Text>
-            {visiblePrograms.length === 0 ? (
-              <View className={styles.emptyBox}>
-                <Text className={styles.emptyText}>{myPrograms.length === 0 ? 'You have not initiated any programs yet.' : 'No programs match this status filter.'}</Text>
-                <TouchableOpacity
-                  className={styles.initiatePromptBtn}
-                  onPress={() => setActiveTab('initiate')}
+      {/* Program Status Filter Row */}
+      {activeTab === 'my_programs' && (
+        <View className="border-b border-black/[0.04] bg-white/70">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="mx-auto w-full max-w-[1280px] flex-row items-center gap-2 px-5 md:px-8 py-2.5"
+          >
+            {([
+              ['all', 'All Statuses'],
+              ['active', 'Active In Field'],
+              ['pending_approval', 'Awaiting Approval'],
+              ['pending_audit', 'Awaiting Audit'],
+              ['completed', 'Completed'],
+            ] as const).map(([filter, label]) => (
+              <TouchableOpacity
+                key={filter}
+                className={`rounded-full px-3.5 py-1.5 border transition-all active:scale-[0.97] ${
+                  programFilter === filter
+                    ? 'border-marush-primary bg-marush-primary shadow-sm'
+                    : 'border-black/[0.08] bg-white shadow-sm'
+                }`}
+                onPress={() => setProgramFilter(filter)}
+              >
+                <Text
+                  className={`text-xs font-semibold ${
+                    programFilter === filter ? 'font-bold text-white' : 'text-slate-600'
+                  }`}
                 >
-                  <Text className={styles.initiatePromptBtnText}>Initiate First Program</Text>
-                </TouchableOpacity>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <ScrollView contentContainerClassName="mx-auto w-full max-w-[1280px] p-4 md:p-8 gap-5">
+        {/* Header Block */}
+        <View className="flex-row flex-wrap items-start justify-between gap-4">
+          <View className="min-w-0 flex-1">
+            <Text className="mb-1 text-[10px] font-black uppercase tracking-[1.8px] text-marush-secondary-dark">
+              PROGRAM MANAGEMENT / CONTROLLER WORKSPACE
+            </Text>
+            <Text className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
+              {activeTab === 'my_programs' ? 'Operations & Schedules' : 'Create New Vaccination Program'}
+            </Text>
+            <Text className="mt-1 max-w-[620px] text-xs md:text-sm leading-relaxed text-slate-500">
+              {activeTab === 'my_programs'
+                ? 'Coordinate vaccination teams, monitor live field progress, and submit completed batches for quality inspection.'
+                : 'Configure farm details, assign certified vaccinators, schedule travel, and submit to Admin for deployment.'}
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-1.5 rounded-full border border-black/[0.06] bg-white px-3.5 py-1.5 shadow-sm">
+            <ClipboardCheck size={14} color={Colors.primary} strokeWidth={2.5} />
+            <Text className="text-xs font-bold text-marush-primary">Lead Controller</Text>
+          </View>
+        </View>
+
+        {activeTab === 'my_programs' ? (
+          <View className="gap-3">
+            {/* Quick Metrics Bar */}
+            <View className="flex-row flex-wrap gap-3">
+              <View className="min-w-[180px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-marush-primary">
+                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Created</Text>
+                <Text className="mt-2 text-3xl font-black tracking-tight text-slate-900">{myPrograms.length}</Text>
+                <Text className="mt-0.5 text-xs text-slate-500">All managed programs</Text>
+              </View>
+
+              <View className="min-w-[180px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-teal-600">
+                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">Active In Field</Text>
+                <Text className="mt-2 text-3xl font-black tracking-tight text-teal-700">
+                  {myPrograms.filter(p => p.status === 'active').length}
+                </Text>
+                <Text className="mt-0.5 text-xs text-slate-500">Currently executing</Text>
+              </View>
+
+              <View className="min-w-[180px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-amber-500">
+                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">Pending Review</Text>
+                <Text className="mt-2 text-3xl font-black tracking-tight text-amber-700">
+                  {myPrograms.filter(p => p.status === 'pending_approval' || p.status === 'pending_audit').length}
+                </Text>
+                <Text className="mt-0.5 text-xs text-slate-500">Awaiting Admin or Auditor</Text>
+              </View>
+            </View>
+
+            {visiblePrograms.length === 0 ? (
+              <View className="items-center rounded-3xl border border-dashed border-black/[0.1] bg-white p-10">
+                <Text className="text-sm font-bold text-slate-800">
+                  {myPrograms.length === 0 ? 'No programs initiated yet' : 'No programs match this filter'}
+                </Text>
+                <Text className="mt-1 max-w-[340px] text-center text-xs text-slate-500">
+                  {myPrograms.length === 0
+                    ? 'Start by creating your first vaccination program schedule.'
+                    : 'Clear the filter above to view all of your programs.'}
+                </Text>
+                {myPrograms.length === 0 && (
+                  <TouchableOpacity
+                    className="mt-4 rounded-2xl bg-marush-primary px-4 py-2.5 shadow-sm active:scale-[0.97]"
+                    onPress={() => setActiveTab('initiate')}
+                  >
+                    <Text className="text-xs font-bold text-white">Create First Program</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               visiblePrograms.map(prog => (
-                <View key={prog.id} className={styles.progCard}>
-                  <View className={styles.cardHeader}>
-                    <Text className={styles.cardTitle}>{prog.programName}</Text>
+                <View
+                  key={prog.id}
+                  className="gap-3 rounded-3xl border border-black/[0.07] bg-white p-5 md:p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                >
+                  <View className="flex-row flex-wrap items-start justify-between gap-2">
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-base font-bold tracking-tight text-slate-900">{prog.programName}</Text>
+                      <Text className="text-sm font-semibold text-slate-600">{prog.hatcheryOrFarmName}</Text>
+                    </View>
                     <View
-                      className={`${styles.statusBadge} bg-marush-subtle`}
+                      className={`rounded-full px-3 py-1 ${
+                        prog.status === 'completed'
+                          ? 'bg-emerald-50 border border-emerald-200'
+                          : prog.status === 'active'
+                          ? 'bg-teal-50 border border-teal-200'
+                          : 'bg-amber-50 border border-amber-200'
+                      }`}
                     >
                       <Text
-                        className={`${styles.statusBadgeText} ${prog.status === 'pending_approval' ? 'text-marush-muted' : 'text-marush-primary'}`}
+                        className={`text-[10px] font-black uppercase tracking-wider ${
+                          prog.status === 'completed'
+                            ? 'text-emerald-800'
+                            : prog.status === 'active'
+                            ? 'text-teal-800'
+                            : 'text-amber-800'
+                        }`}
                       >
                         {prog.status.replace('_', ' ').toUpperCase()}
                       </Text>
                     </View>
                   </View>
 
-                  <Text className={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                  <Text className={styles.cardMeta}>
-                    Flock: {prog.flockSize.toLocaleString()} birds Ã¢â‚¬Â¢ Team: {prog.teamMemberIds.length} members
-                  </Text>
-                  <Text className={styles.cardMeta}>
-                    Schedule: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
-                  </Text>
-                  {prog.auditorName ? (
-                    <Text className={styles.cardMeta}>Assigned Auditor: {prog.auditorName}</Text>
-                  ) : null}
+                  <View className="flex-row flex-wrap items-center gap-x-6 gap-y-1.5 rounded-2xl border border-black/[0.05] bg-slate-50/80 p-3.5">
+                    <Text className="text-xs text-slate-600">
+                      Flock: <Text className="font-bold text-slate-900">{prog.flockSize.toLocaleString()}</Text> birds
+                    </Text>
+                    <Text className="text-xs text-slate-600">
+                      Team: <Text className="font-bold text-slate-900">{prog.teamMemberIds.length}</Text> vaccinators
+                    </Text>
+                    <Text className="text-xs text-slate-500">
+                      Schedule: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
+                    </Text>
+                    {prog.auditorName && (
+                      <Text className="text-xs text-slate-500">
+                        Auditor: <Text className="font-semibold text-slate-700">{prog.auditorName}</Text>
+                      </Text>
+                    )}
+                  </View>
 
                   {prog.status === 'active' && (
                     <TouchableOpacity
-                      className={styles.endProgBtn}
+                      className="mt-1 items-center rounded-2xl bg-marush-primary py-3 shadow-[0_2px_8px_rgba(0,79,66,0.18)] transition-all active:scale-[0.98]"
                       onPress={() => handleOpenEndProgram(prog)}
                     >
-                      <Text className={styles.endProgBtnText}>End Program & Send to Auditor</Text>
+                      <View className="flex-row items-center justify-center gap-2">
+                        <Send size={15} color={Colors.white} />
+                        <Text className="text-xs font-bold text-white tracking-tight">End Program & Submit to Auditor</Text>
+                      </View>
                     </TouchableOpacity>
                   )}
 
                   {prog.status === 'pending_approval' && (
-                    <View className={styles.waitingBanner}>
-                      <Text className={styles.waitingBannerText}>
-                        Team submitted. Waiting for Admin to approve & assign Auditor.
+                    <View className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
+                      <Text className="text-xs font-semibold text-amber-800">
+                        Submitted to Admin. Awaiting approval and Auditor assignment.
                       </Text>
                     </View>
                   )}
 
                   {prog.status === 'pending_audit' && (
-                    <View className={styles.waitingBanner}>
-                      <Text className={styles.waitingBannerText}>
-                        Program completed. Awaiting Auditor's review and remarks.
+                    <View className="rounded-2xl border border-teal-200 bg-teal-50/70 p-3">
+                      <Text className="text-xs font-semibold text-teal-800">
+                        Vaccination completed. Awaiting Auditor inspection and remarks.
                       </Text>
                     </View>
                   )}
 
-                  {prog.status === 'completed' && prog.auditorRemarks ? (
-                    <View className={styles.auditFeedback}>
-                      <Text className={styles.auditFeedbackTitle}>
-                        Auditor Sign-off ({prog.auditorName}):
+                  {prog.status === 'completed' && prog.auditorRemarks && (
+                    <View className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-3.5">
+                      <Text className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                        Auditor Sign-off ({prog.auditorName})
                       </Text>
-                      <Text className={styles.auditFeedbackText}>"{prog.auditorRemarks}"</Text>
+                      <Text className="mt-0.5 text-xs italic text-emerald-900">"{prog.auditorRemarks}"</Text>
                       {prog.auditScore ? (
-                        <Text className={styles.auditScorePill}>Audit Score: {prog.auditScore}/100</Text>
+                        <Text className="mt-1 text-xs font-black text-emerald-800">
+                          Quality Score: {prog.auditScore} / 100
+                        </Text>
                       ) : null}
                     </View>
-                  ) : null}
+                  )}
                 </View>
               ))
             )}
           </View>
         ) : (
-          <View className={styles.formCard}>
-            <Text className={styles.formTitle}>Initiate Program & Field Schedule</Text>
-            <Text className={styles.formSub}>
-              Fill in farm, bird, vaccine, and travel details. The creator, submission timestamp, and status are automatically recorded.
-            </Text>
+          <View className="gap-5 rounded-3xl border border-black/[0.07] bg-white p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)]">
 
             {/* SECTION 1: Farm Details */}
             <View className="mb-2 mt-1 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">

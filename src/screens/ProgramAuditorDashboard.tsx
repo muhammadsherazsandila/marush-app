@@ -184,99 +184,189 @@ export const ProgramAuditorDashboard: React.FC<ProgramAuditorDashboardProps> = (
   };
 
   return (
-    <View className={styles.container}>
-      {activeArea === 'programs' && <View className={styles.tabBar}>
-        <View className={styles.tabGroup}>
+    <View className="flex-1 bg-slate-50">
+      {/* Sub-header navigation row matching AdminDashboard */}
+      <View className="border-b border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+        <View className="mx-auto w-full max-w-[1280px] flex-row items-center justify-between px-5 md:px-8 py-0">
+          <View className="flex-row items-center gap-5">
+            <TouchableOpacity
+              className={`border-b-2 px-1 py-4 ${activeTab === 'pending' ? 'border-marush-primary' : 'border-transparent'}`}
+              onPress={() => setActiveTab('pending')}
+            >
+              <Text className={`text-[13px] ${activeTab === 'pending' ? 'font-bold text-marush-primary' : 'font-semibold text-slate-500'}`}>
+                Pending Inspection ({pendingAudits.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className={`border-b-2 px-1 py-4 ${activeTab === 'completed' ? 'border-marush-primary' : 'border-transparent'}`}
+              onPress={() => setActiveTab('completed')}
+            >
+              <Text className={`text-[13px] ${activeTab === 'completed' ? 'font-bold text-marush-primary' : 'font-semibold text-slate-500'}`}>
+                Audited & Archived ({completedAudits.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            className={`${styles.tabBtn} ${activeTab === 'pending' ? styles.tabBtnActive : ''}`}
-            onPress={() => setActiveTab('pending')}
+            className="flex-row items-center gap-1.5 rounded-2xl border border-black/[0.08] bg-white px-3.5 py-2 shadow-sm transition-all active:scale-[0.97]"
+            onPress={refreshData}
+            disabled={loading}
           >
-            <Text className={`${styles.tabBtnText} ${activeTab === 'pending' ? styles.tabBtnTextActive : ''}`}>
-              Pending Review ({pendingAudits.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`${styles.tabBtn} ${activeTab === 'completed' ? styles.tabBtnActive : ''}`}
-            onPress={() => setActiveTab('completed')}
-          >
-            <Text className={`${styles.tabBtnText} ${activeTab === 'completed' ? styles.tabBtnTextActive : ''}`}>
-              Audited Programs ({completedAudits.length})
-            </Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <>
+                <RefreshCw size={14} color={Colors.primary} strokeWidth={2.4} />
+                <Text className="text-xs font-bold text-marush-primary">Refresh</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
+      </View>
 
-        <TouchableOpacity className={styles.refreshBtn} onPress={refreshData} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
-          ) : (
-            <View className="flex-row items-center gap-1.5">
-              <RefreshCw size={15} color={Colors.primary} />
-              <Text className={styles.refreshBtnText}>Refresh</Text>
+      <ScrollView contentContainerClassName="mx-auto w-full max-w-[1280px] p-4 md:p-8 gap-5">
+        {/* Header Block */}
+        <View className="flex-row flex-wrap items-start justify-between gap-4">
+          <View className="min-w-0 flex-1">
+            <Text className="mb-1 text-[10px] font-black uppercase tracking-[1.8px] text-marush-secondary-dark">
+              QUALITY AUDIT / VETERINARY COMPLIANCE
+            </Text>
+            <Text className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
+              {activeTab === 'pending' ? 'Inspections Awaiting Audit' : 'Verified Audit History'}
+            </Text>
+            <Text className="mt-1 max-w-[620px] text-xs md:text-sm leading-relaxed text-slate-500">
+              Review completed field vaccination records, verify cold-chain logs, assess PPE compliance, and issue official sign-offs.
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-1.5 rounded-full border border-black/[0.06] bg-white px-3.5 py-1.5 shadow-sm">
+            <ShieldCheck size={14} color={Colors.primary} strokeWidth={2.5} />
+            <Text className="text-xs font-bold text-marush-primary">Official Auditor</Text>
+          </View>
+        </View>
+
+        {/* Metric Summary Cards */}
+        <View className="flex-row flex-wrap gap-3">
+          <View className="min-w-[190px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-amber-500">
+            <View className="flex-row items-center justify-between gap-2">
+              <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">Needs Audit</Text>
+              <View className="rounded-xl bg-amber-50 p-2">
+                <ClipboardCheck size={16} color="#D97706" strokeWidth={2.4} />
+              </View>
             </View>
-          )}
-        </TouchableOpacity>
-      </View>}
+            <Text className="mt-2 text-3xl font-black tracking-tight text-amber-700">
+              {pendingAudits.length}
+            </Text>
+            <Text className="mt-0.5 text-xs text-slate-500">Awaiting inspection</Text>
+          </View>
 
-      <ScrollView contentContainerClassName={styles.content}>
+          <View className="min-w-[190px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-emerald-600">
+            <View className="flex-row items-center justify-between gap-2">
+              <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">Verified & Done</Text>
+              <View className="rounded-xl bg-emerald-50 p-2">
+                <Check size={16} color="#059669" strokeWidth={2.4} />
+              </View>
+            </View>
+            <Text className="mt-2 text-3xl font-black tracking-tight text-emerald-700">
+              {completedAudits.length}
+            </Text>
+            <Text className="mt-0.5 text-xs text-slate-500">Fully signed off</Text>
+          </View>
+        </View>
+
         {activeTab === 'pending' ? (
-          <View className={styles.section}>
-            <Text className={styles.sectionTitle}>Programs Awaiting Quality Audit & Sign-off</Text>
+          <View className="gap-3">
             {pendingAudits.length === 0 ? (
-              <View className={styles.emptyBox}>
-                <Text className={styles.emptyText}>All programs audited! No pending inspections.</Text>
+              <View className="items-center rounded-3xl border border-dashed border-black/[0.1] bg-white p-10">
+                <View className="mb-2 rounded-full bg-emerald-50 p-3">
+                  <Check size={22} color="#059669" />
+                </View>
+                <Text className="text-sm font-bold text-slate-800">All programs audited</Text>
+                <Text className="mt-1 max-w-[340px] text-center text-xs text-slate-500">
+                  There are no pending inspection submissions awaiting your review right now.
+                </Text>
               </View>
             ) : (
               pendingAudits.map(prog => (
-                <View key={prog.id} className={styles.card}>
-                  <View className={styles.cardHeader}>
-                    <Text className={styles.cardTitle}>{prog.programName}</Text>
-                    <View className={styles.pendingBadge}>
-                      <Text className={styles.pendingBadgeText}>NEEDS AUDIT</Text>
+                <View key={prog.id} className="gap-3 rounded-3xl border border-black/[0.07] bg-white p-5 md:p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                  <View className="flex-row flex-wrap items-start justify-between gap-2">
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-base font-bold tracking-tight text-slate-900">{prog.programName}</Text>
+                      <Text className="text-sm font-medium text-slate-600">{prog.hatcheryOrFarmName}</Text>
+                    </View>
+                    <View className="rounded-full bg-amber-50 border border-amber-200/80 px-3 py-1">
+                      <Text className="text-[10px] font-black uppercase tracking-wider text-amber-800">NEEDS AUDIT</Text>
                     </View>
                   </View>
-                  <Text className={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                  <Text className={styles.cardMeta}>
-                    Controller: {prog.controllerName} Ã¢â‚¬Â¢ Flock: {prog.flockSize.toLocaleString()} birds
-                  </Text>
+
+                  <View className="flex-row flex-wrap items-center gap-x-6 gap-y-1.5 rounded-2xl border border-black/[0.05] bg-slate-50/80 p-3.5">
+                    <Text className="text-xs text-slate-600">
+                      Flock: <Text className="font-bold text-slate-900">{prog.flockSize.toLocaleString()}</Text> birds
+                    </Text>
+                    <Text className="text-xs text-slate-600">
+                      Controller: <Text className="font-semibold text-slate-800">{prog.controllerName || 'Field Lead'}</Text>
+                    </Text>
+                    <Text className="text-xs text-slate-500">
+                      Scheduled: {prog.scheduledStartDate} ({prog.scheduledStartTime} - {prog.scheduledEndTime})
+                    </Text>
+                  </View>
 
                   {prog.completionMetrics && (
-                    <View className={styles.metricsPreview}>
-                      <Text className={styles.metricsPreviewText}>
-                        Vaccinated: {prog.completionMetrics.birdsVaccinated.toLocaleString()} Ã¢â‚¬Â¢ Batch: {prog.completionMetrics.batchNumber} Ã¢â‚¬Â¢ Cold-Chain: {prog.completionMetrics.coldChainTempCelsius}Ã‚Â°C
+                    <View className="gap-1 rounded-2xl border border-black/[0.05] bg-slate-50 p-3.5">
+                      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Field Completion Logs</Text>
+                      <Text className="text-xs text-slate-600">
+                        Vaccinated: <Text className="font-bold text-slate-800">{prog.completionMetrics.birdsVaccinated.toLocaleString()}</Text> birds • Cold-Chain: <Text className="font-bold text-slate-800">{prog.completionMetrics.coldChainTempCelsius}°C</Text> • Batch: <Text className="font-mono text-slate-800">{prog.completionMetrics.batchNumber}</Text>
                       </Text>
+                      {prog.completionMetrics.farmFlockObservations && (
+                        <Text className="mt-0.5 text-xs italic text-slate-500">"{prog.completionMetrics.farmFlockObservations}"</Text>
+                      )}
                     </View>
                   )}
 
                   <TouchableOpacity
-                    className={styles.reviewBtn}
+                    className="mt-1 items-center rounded-2xl bg-marush-primary py-3 shadow-[0_2px_8px_rgba(0,79,66,0.18)] transition-all active:scale-[0.98]"
                     onPress={() => handleOpenAuditModal(prog)}
                   >
-                    <Text className={styles.reviewBtnText}>Inspect & Enter Remarks</Text>
+                    <View className="flex-row items-center justify-center gap-2">
+                      <ClipboardCheck size={16} color={Colors.white} />
+                      <Text className="text-xs font-bold text-white tracking-tight">Open Audit & Enter Observations</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               ))
             )}
           </View>
         ) : (
-          <View className={styles.section}>
-            <Text className={styles.sectionTitle}>Historical Audits & Remarks Log</Text>
+          <View className="gap-3">
             {completedAudits.length === 0 ? (
-              <View className={styles.emptyBox}>
-                <Text className={styles.emptyText}>No completed audits recorded yet.</Text>
+              <View className="items-center rounded-3xl border border-dashed border-black/[0.1] bg-white p-10">
+                <Text className="text-sm font-bold text-slate-800">No completed audits recorded yet</Text>
+                <Text className="mt-1 max-w-[340px] text-center text-xs text-slate-500">
+                  When you inspect and sign off on a program, it will be archived here.
+                </Text>
               </View>
             ) : (
               completedAudits.map(prog => (
-                <View key={prog.id} className={styles.card}>
-                  <View className={styles.cardHeader}>
-                    <Text className={styles.cardTitle}>{prog.programName}</Text>
-                    <View className={styles.doneBadge}>
-                      <Text className={styles.doneBadgeText}>AUDITED & DONE</Text>
+                <View key={prog.id} className="gap-2.5 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                  <View className="flex-row flex-wrap items-start justify-between gap-2">
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-base font-bold tracking-tight text-slate-900">{prog.programName}</Text>
+                      <Text className="text-sm font-medium text-slate-600">{prog.hatcheryOrFarmName}</Text>
+                    </View>
+                    <View className="rounded-full bg-emerald-50 border border-emerald-200/80 px-3 py-1">
+                      <Text className="text-[10px] font-black uppercase tracking-wider text-emerald-800">AUDITED & APPROVED</Text>
                     </View>
                   </View>
-                  <Text className={styles.cardSub}>{prog.hatcheryOrFarmName}</Text>
-                  <Text className={styles.scoreText}>Quality Score: {prog.auditScore}/100</Text>
-                  <View className={styles.remarksBox}>
-                    <Text className={styles.remarksText}>"{prog.auditorRemarks}"</Text>
+
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-xs font-black text-emerald-800">Quality Score: {prog.auditScore}/100</Text>
+                    <Text className="text-xs text-slate-400">•</Text>
+                    <Text className="text-xs text-slate-500">Controller: {prog.controllerName}</Text>
+                  </View>
+
+                  <View className="mt-1 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-3.5">
+                    <Text className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Auditor Findings</Text>
+                    <Text className="mt-0.5 text-xs italic text-emerald-900">"{prog.auditorRemarks}"</Text>
                   </View>
                 </View>
               ))
