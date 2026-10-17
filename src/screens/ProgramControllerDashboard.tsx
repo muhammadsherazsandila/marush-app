@@ -490,6 +490,7 @@ export const ProgramControllerDashboard: React.FC<
             showsHorizontalScrollIndicator={false}
             className="min-w-0 flex-1"
             contentContainerClassName="flex-row items-center gap-5 pr-4"
+            contentContainerStyle={{ flexGrow: 1 }}
           >
             <TouchableOpacity
               className={`border-b-2 px-1 py-4 ${activeTab === "my_programs" ? "border-marush-primary" : "border-transparent"}`}
@@ -551,7 +552,7 @@ export const ProgramControllerDashboard: React.FC<
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerClassName="mx-auto w-full max-w-[1280px] flex-row items-center gap-2 px-5 md:px-8 py-2.5"
+            contentContainerClassName="flex-row items-center gap-2 px-5 md:px-8 py-2.5"
           >
             {(
               [

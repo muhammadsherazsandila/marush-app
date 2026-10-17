@@ -163,7 +163,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </View>
 
         {/* Elevated Card Form */}
-        <View className="mx-auto -mt-10 w-full max-w-[480px] px-5 pb-10">
+        <View className="mx-auto -mt-20 w-full max-w-[480px] px-5 pb-10">
           <View className="rounded-3xl border border-black/[0.07] bg-white p-7 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
             <View className="items-center">
               <Text className="text-[26px] font-black tracking-tight text-slate-900">
