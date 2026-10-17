@@ -1,34 +1,34 @@
 import {
-    Check,
-    CircleX,
-    ClipboardCheck,
-    Clock3,
-    Plus,
-    RefreshCw,
-    Save,
-    Search,
-    Send
+  Check,
+  CircleX,
+  ClipboardCheck,
+  Clock3,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Send,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { useConfirmDialog } from "../components/ConfirmDialog";
 import { Colors } from "../constants/colors";
 import { dataProvider } from "../services";
 import {
-    Program,
-    ProgramCompletionMetrics,
-    ProgramDraft,
-    ProgramStatus,
-    UserProfile,
+  Program,
+  ProgramCompletionMetrics,
+  ProgramDraft,
+  ProgramStatus,
+  UserProfile,
 } from "../types";
 
 interface ProgramControllerDashboardProps {
@@ -481,7 +481,7 @@ export const ProgramControllerDashboard: React.FC<
   };
 
   return (
-    <View className="flex-1 bg-slate-50">
+    <View className="flex-1">
       {/* Sub-header navigation row matching AdminDashboard */}
       <View className="border-b border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
         <View className="mx-auto w-full max-w-[1280px] flex-row items-center px-5 md:px-8 py-0">
@@ -587,7 +587,7 @@ export const ProgramControllerDashboard: React.FC<
         </View>
       )}
 
-      <ScrollView contentContainerClassName="mx-auto w-full max-w-[1280px] p-4 md:p-8 gap-5">
+      <ScrollView contentContainerClassName="mx-auto w-full max-w-[1280px] gap-5">
         {/* Header Block */}
         <View className="flex-row flex-wrap items-start justify-between gap-4">
           <View className="min-w-0 flex-1">
@@ -807,7 +807,7 @@ export const ProgramControllerDashboard: React.FC<
           </View>
         ) : (
           <View className="gap-5">
-            <View className="rounded-3xl bg-[#163B43] p-5 shadow-[0_6px_24px_rgba(21,42,53,0.16)] md:p-7">
+            <View className="rounded-3xl bg-[#163B43] p-5 shadow-[0_6px_24px_rgba(21,42,53,0.16)]">
               <View className="flex-row flex-wrap items-start justify-between gap-4">
                 <View className="min-w-0 flex-1">
                   <View className="flex-row items-center gap-2">
@@ -859,9 +859,9 @@ export const ProgramControllerDashboard: React.FC<
               </View>
             </View>
 
-            <View className="gap-5 rounded-3xl border border-black/[0.07] bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] md:p-8">
+            <View className="gap-5">
               {/* SECTION 1: Farm Details */}
-              <View className="mb-2 mt-1 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 mt-1 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   1. Farm Details
                 </Text>
@@ -914,7 +914,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 2: Team Details */}
-              <View className="mb-2 rounded-2xl border border-black/[0.07] bg-slate-50/70 p-4">
+              <View className="mb-2 rounded-2xl border border-black/[0.07] p-4 bg-white">
                 <View className="mb-2.5 flex-row items-center justify-between">
                   <Text className="text-xs font-black uppercase tracking-wider text-marush-primary">
                     2. Team Allocation
@@ -1070,7 +1070,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 3: Program Details */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   3. Program Details
                 </Text>
@@ -1119,7 +1119,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 4: Bird Details */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   4. Bird Details (Number of Birds Categorized)
                 </Text>
@@ -1183,7 +1183,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 5: Vaccine Details */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   5. Vaccine Details
                 </Text>
@@ -1203,7 +1203,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 6: Travel Schedule */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   6. Travel Schedule
                 </Text>
@@ -1235,7 +1235,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 7: Vaccination Schedule */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   7. Vaccination Schedule
                 </Text>
@@ -1265,7 +1265,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 8: Return Schedule */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   8. Return Schedule
                 </Text>
@@ -1297,7 +1297,7 @@ export const ProgramControllerDashboard: React.FC<
               </View>
 
               {/* SECTION 9: Submission & Remarks */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-marush-subtle/40 p-3.5">
+              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
                 <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
                   9. Submission & Remarks
                 </Text>
@@ -1557,7 +1557,7 @@ const styles = {
   inputGroup: "gap-1.5",
   label: "text-xs font-bold uppercase tracking-wider text-slate-500",
   input:
-    "rounded-xl border border-black/[0.08] bg-slate-50/80 px-3.5 py-2.5 text-sm text-slate-800",
+    "rounded-xl border border-black/[0.08] px-3.5 py-2.5 text-sm text-slate-800",
   row: "flex-row flex-wrap gap-3",
   empSelectHeader: "flex-row flex-wrap items-center justify-between gap-2",
   availCount: "text-xs font-bold text-marush-secondary-dark",
