@@ -81,8 +81,9 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" \
-          "marush-app-web-${GITHUB_REF_NAME}.zip" \
-          "marush-app-web-${GITHUB_REF_NAME}.zip.sha256" \
-          --title "Marush Web ${GITHUB_REF_NAME}" \
-          --notes-file release_notes.md
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "marush-app-web-${GITHUB_REF_NAME}.zip" \
+            "marush-app-web-${GITHUB_REF_NAME}.zip.sha256" \
+            --title "Marush Web ${GITHUB_REF_NAME}" \
+            --notes-file release_notes.md
