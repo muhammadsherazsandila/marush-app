@@ -80,6 +80,31 @@ export interface Program {
   updatedAt?: string;
 }
 
+export interface ProgramDraft {
+  programName: string;
+  hatcheryOrFarm: string;
+  farmAddress: string;
+  farmManagerName: string;
+  birdBreeder: string;
+  birdLayer: string;
+  birdBroiler: string;
+  flockSize: string;
+  vaccinesUsed: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  travelDepartureTime: string;
+  travelArrivalTime: string;
+  vaccinationStartedAtTime: string;
+  vaccinationCompletedAtTime: string;
+  returnDepartureTime: string;
+  returnArrivalTime: string;
+  controllerRemarks: string;
+  selectedEmpIds: string[];
+  savedAt: string;
+}
+
 // ---- Program Member (join table) ----
 export type ProgramMemberRole = 'team_member' | 'program_controller';
 

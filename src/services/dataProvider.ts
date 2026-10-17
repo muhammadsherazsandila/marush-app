@@ -11,6 +11,7 @@ import type {
   ProgramCompletionMetrics,
   ProgramMemberHistory,
   ProgramMemberRole,
+  ProgramDraft,
   UserProfile,
   UserRole,
   UserStatus,
@@ -51,6 +52,29 @@ const clearRequestedRole = async () => {
     return;
   }
   await AsyncStorage.removeItem(REQUESTED_ROLE_KEY);
+};
+
+const programDraftKey = (userId: string) => `marush.program-draft.${userId}`;
+
+const readStorage = async (key: string) =>
+  Platform.OS === "web" && typeof window !== "undefined"
+    ? window.localStorage.getItem(key)
+    : await AsyncStorage.getItem(key);
+
+const writeStorage = async (key: string, value: string) => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(key, value);
+    return;
+  }
+  await AsyncStorage.setItem(key, value);
+};
+
+const removeStorage = async (key: string) => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.removeItem(key);
+    return;
+  }
+  await AsyncStorage.removeItem(key);
 };
 
 const backendFailure = <T>(_getValue: () => T, backendMessage?: string): T => {
@@ -730,6 +754,25 @@ export const dataProvider = {
       return createdProgram;
     }
     return backendFailure(() => mockStore.createProgram(data));
+  },
+
+  saveProgramDraft: async (userId: string, draft: ProgramDraft): Promise<void> => {
+    await writeStorage(programDraftKey(userId), JSON.stringify(draft));
+  },
+
+  getProgramDraft: async (userId: string): Promise<ProgramDraft | null> => {
+    const value = await readStorage(programDraftKey(userId));
+    if (!value) return null;
+    try {
+      return JSON.parse(value) as ProgramDraft;
+    } catch {
+      await removeStorage(programDraftKey(userId));
+      return null;
+    }
+  },
+
+  clearProgramDraft: async (userId: string): Promise<void> => {
+    await removeStorage(programDraftKey(userId));
   },
 
   approveProgramAndStart: async (
