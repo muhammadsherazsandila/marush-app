@@ -1,6 +1,6 @@
 {
   "name": "marush-app",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Marush (Pvt.) Ltd. - Exclusive Ceva Animal Health Sole Distributor Pakistan - Poultry Vaccination & Flock Monitoring Mobile Application",
   "main": "index.js",
   "packageManager": "pnpm@10.23.0",

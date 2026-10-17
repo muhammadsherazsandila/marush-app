@@ -1326,7 +1326,7 @@ export const ProgramControllerDashboard: React.FC<
                 </View>
               </View>
 
-              <View className="mt-1 flex-row flex-wrap gap-3">
+              <View className="mt-1 flex-col gap-3 p-3">
                 <TouchableOpacity
                   className="min-w-[150px] flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-marush-primary/20 bg-marush-primary-subtle px-4 py-3.5 active:scale-[0.98]"
                   onPress={() => handleSaveDraft()}
