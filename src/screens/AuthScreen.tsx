@@ -312,11 +312,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            <Text className="mt-5 text-center text-xs leading-relaxed text-amber-800">
-              On a fresh setup, the first verified Google account becomes the
-              administrator. Make sure the designated administrator signs in
-              first; later accounts need administrator approval.
-            </Text>
             <Text className="mt-3 text-center text-xs leading-relaxed text-slate-400">
               Authorized personnel only. Sessions are monitored for operational
               integrity.
