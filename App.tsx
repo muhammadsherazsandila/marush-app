@@ -252,7 +252,7 @@ export default function App() {
     setActiveTab(tab);
   };
 
-  const renderDashboardByRole = (tab: Exclude<WorkspaceTab, 'profile'>) => {
+  const renderDashboardByRole = (tab: Exclude<WorkspaceTab, 'profile' | 'employees'>) => {
     if (!currentUser) return null;
 
     switch (currentUser.role) {
@@ -303,7 +303,7 @@ export default function App() {
                 onBack={showNotifications ? () => setShowNotifications(false) : selectedProgram ? () => setSelectedProgram(null) : undefined}
                 onNotifications={() => setShowNotifications(true)}
               />
-              {activeTab !== 'overview' && width < 768 && (
+              {activeTab !== 'overview' && activeTab !== 'employees' && width < 768 && (
               <View className="px-4 pt-3">
                 <TouchableOpacity
                   className="flex-row items-center gap-2 self-start rounded-full border border-marush-border bg-white px-3.5 py-2 shadow-sm"
@@ -329,6 +329,8 @@ export default function App() {
                 />
               ) : activeTab === 'profile' ? (
                 <ProfileScreen user={currentUser} onLogout={handleLogout} />
+              ) : activeTab === 'employees' && currentUser.role === 'admin' ? (
+                <AdminDashboard currentUser={currentUser} activeArea="employees" />
               ) : activeTab === 'overview' ? (
                 <OperationsHome
                   currentUser={currentUser}
@@ -339,9 +341,15 @@ export default function App() {
                     setSelectedProgram(program);
                   }}
                 />
-              ) : renderDashboardByRole(activeTab)}
+              ) : renderDashboardByRole(activeTab === 'programs' ? 'programs' : 'overview')}
             </View>
-            {width < 768 && <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />}
+            {width < 768 && (
+              <BottomTabBar
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                isAdmin={currentUser.role === 'admin'}
+              />
+            )}
             </View>
           </View>
         )}

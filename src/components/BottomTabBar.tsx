@@ -1,13 +1,14 @@
 import React from 'react';
 import { Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
-import { LayoutDashboard, BriefcaseBusiness, UserRound } from 'lucide-react-native';
+import { LayoutDashboard, BriefcaseBusiness, UserRound, Users } from 'lucide-react-native';
 import { Colors } from '../constants/colors';
 
-export type WorkspaceTab = 'overview' | 'programs' | 'profile';
+export type WorkspaceTab = 'overview' | 'programs' | 'employees' | 'profile';
 
 interface BottomTabBarProps {
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
+  isAdmin: boolean;
 }
 
 const tabs = [
@@ -16,8 +17,16 @@ const tabs = [
   { id: 'profile', label: 'Profile', Icon: UserRound },
 ] as const;
 
-export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) => {
+export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange, isAdmin }) => {
   const { width } = useWindowDimensions();
+  const visibleTabs = isAdmin
+    ? [
+        tabs[0],
+        tabs[1],
+        { id: 'employees' as const, label: 'Employees', Icon: Users },
+        tabs[2],
+      ]
+    : tabs;
 
   return (
     <View
@@ -30,7 +39,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChan
         }`}
         accessibilityRole="tablist"
       >
-        {tabs.map(({ id, label, Icon }) => {
+        {visibleTabs.map(({ id, label, Icon }) => {
           const active = activeTab === id;
           return (
             <TouchableOpacity
