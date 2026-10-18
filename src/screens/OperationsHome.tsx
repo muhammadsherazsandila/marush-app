@@ -42,6 +42,7 @@ const statusLabel: Record<Program["status"], string> = {
   pending_approval: "Awaiting approval",
   active: "In field",
   pending_audit: "Awaiting audit",
+  pending_admin_review: "Awaiting admin review",
   completed: "Completed",
   cancelled: "Cancelled",
 };

@@ -33,6 +33,7 @@ import { Program, UserProfile, UserRole } from "../types";
 interface AdminDashboardProps {
   currentUser: UserProfile;
   activeArea: "overview" | "programs" | "employees";
+  onSelfDeleted?: () => void;
 }
 
 type TabType =
@@ -41,11 +42,14 @@ type TabType =
   | "programs"
   | "active_programs"
   | "pending_audit"
+  | "pending_admin_review"
   | "employees"
   | "approvals";
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   activeArea,
+  currentUser,
+  onSelfDeleted,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -67,12 +71,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Program Detail / Inspection Modal
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
-
-  // Auditor Assignment Modal for Team Approval
-  const [approvingProgram, setApprovingProgram] = useState<Program | null>(
-    null,
-  );
-  const [selectedAuditorId, setSelectedAuditorId] = useState<string>("");
+  const [programForAuditorAssignment, setProgramForAuditorAssignment] =
+    useState<Program | null>(null);
+  const [selectedAuditorId, setSelectedAuditorId] = useState("");
+  const [savingAuditor, setSavingAuditor] = useState(false);
 
   const { confirm, ConfirmDialogElement } = useConfirmDialog();
 
@@ -116,12 +118,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingTeamPrograms = programs.filter(
     (p) => p.status === "pending_approval",
   );
-  const pendingAuditPrograms = programs.filter(
-    (p) => p.status === "pending_audit",
+  const pendingAdminReviewPrograms = programs.filter(
+    (p) => p.status === "pending_admin_review" || p.status === "pending_audit",
   );
   const pendingUsers = users.filter((u) => u.status === "pending");
-  const auditors = users.filter(
-    (u) => u.role === "program_auditor" && u.status === "approved",
+  const availableAuditors = users.filter(
+    (user) => user.role === "program_auditor" && user.status === "approved",
   );
 
   // Filtered lists for search
@@ -162,7 +164,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleOpenEditEmp = (emp: UserProfile) => {
-    if (emp.role === "admin") {
+    if (emp.isSuperAdmin || (emp.role === "admin" && !currentUser.isSuperAdmin)) {
       Toast.show({
         type: "error",
         text1: "Action Not Permitted",
@@ -191,7 +193,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     if (editingEmp) {
-      if (editingEmp.role === "admin") {
+      if (
+        editingEmp.isSuperAdmin ||
+        ((editingEmp.role === "admin" || empRole === "admin") &&
+          !currentUser.isSuperAdmin)
+      ) {
         Toast.show({
           type: "error",
           text1: "Action Not Permitted",
@@ -237,7 +243,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeleteEmployee = (targetUser: UserProfile) => {
-    if (targetUser.role === "admin") {
+    const isSelf = targetUser.id === currentUser.id;
+    if (isSelf && currentUser.isSuperAdmin) {
+      Toast.show({
+        type: "error",
+        text1: "Action Not Permitted",
+        text2: "The superadmin account cannot delete itself.",
+      });
+      return;
+    }
+    if (
+      (targetUser.role === "admin" || targetUser.isSuperAdmin) &&
+      !currentUser.isSuperAdmin
+    ) {
       Toast.show({
         type: "error",
         text1: "Action Not Permitted",
@@ -248,15 +266,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     confirm({
-      title: "Delete Employee",
+      title: targetUser.role === "admin"
+          ? "Delete Administrator"
+          : "Delete Employee",
       message: `Are you sure you want to permanently delete "${targetUser.fullName || targetUser.email}"? This action cannot be undone and will revoke all access immediately.`,
-      confirmText: "Delete Employee",
+      confirmText: targetUser.role === "admin"
+          ? "Delete Administrator"
+          : "Delete Employee",
       cancelText: "Cancel",
       variant: "danger",
       icon: "trash",
       onConfirm: async () => {
         try {
           await dataProvider.deleteUser(targetUser.id);
+          if (isSelf) {
+            Toast.show({
+              type: "info",
+              text1: "Account deleted",
+              text2: "You have been signed out.",
+            });
+            onSelfDeleted?.();
+            return;
+          }
           Toast.show({
             type: "info",
             text1: "Deleted",
@@ -314,56 +345,109 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  // Program Approval & Auditor Assignment
-  const handleOpenTeamApproval = (prog: Program) => {
-    setApprovingProgram(prog);
-    if (auditors.length > 0) {
-      setSelectedAuditorId(auditors[0].id);
+  const openAuditorAssignment = (program: Program) => {
+    setProgramForAuditorAssignment(program);
+    setSelectedAuditorId(program.auditorId || "");
+  };
+
+  const saveAuditorAssignment = async () => {
+    if (!programForAuditorAssignment || !selectedAuditorId) return;
+    setSavingAuditor(true);
+    try {
+      await dataProvider.assignProgramAuditor(
+        programForAuditorAssignment.id,
+        selectedAuditorId,
+      );
+      Toast.show({
+        type: "success",
+        text1: "Auditor Assigned",
+        text2: "The program is ready for admin approval.",
+      });
+      setProgramForAuditorAssignment(null);
+      refreshData();
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Unable to assign auditor",
+        text2: error?.message || "Try again.",
+      });
+    } finally {
+      setSavingAuditor(false);
     }
   };
 
-  const handleConfirmTeamApproval = () => {
-    if (!approvingProgram) return;
-    if (!selectedAuditorId) {
+  const handleOpenTeamApproval = (program: Program) => {
+    openAuditorAssignment(program);
+  };
+
+  const handleApproveAndStartProgram = (program: Program) => {
+    if (!program.auditorId) {
       Toast.show({
         type: "error",
         text1: "Auditor Required",
-        text2: "Please assign a Program Auditor.",
+        text2: "Assign an approved program auditor before approving this program.",
       });
       return;
     }
-
-    const assignedAuditor = auditors.find((a) => a.id === selectedAuditorId);
-    const auditorName = assignedAuditor
-      ? assignedAuditor.fullName
-      : "Selected Auditor";
-
     confirm({
-      title: "Start Program & Assign Auditor",
-      message: `Are you sure you want to approve "${approvingProgram.programName}" and assign ${auditorName} as the Program Auditor? The program will immediately become ACTIVE.`,
+      title: "Approve & Start Program",
+      message: `Approve "${program.programName}" and start its field team with ${program.auditorName || "the assigned auditor"}?`,
       confirmText: "Approve & Start",
-      cancelText: "Back",
+      cancelText: "Cancel",
       variant: "primary",
-      icon: "shield",
+      icon: "check",
       onConfirm: async () => {
-        await dataProvider.approveProgramAndStart(
-          approvingProgram.id,
-          selectedAuditorId,
-        );
-        Toast.show({
-          type: "success",
-          text1: "Program Approved & Started",
-          text2: `${approvingProgram.programName} is now ACTIVE!`,
-        });
-        setApprovingProgram(null);
-        refreshData();
+        try {
+          await dataProvider.approveProgramAndStart(program.id, program.auditorId!);
+          Toast.show({
+            type: "success",
+            text1: "Program Approved",
+            text2: `${program.programName} is now active.`,
+          });
+          refreshData();
+        } catch (error: any) {
+          Toast.show({
+            type: "error",
+            text1: "Unable to approve program",
+            text2: error?.message || "Assign an auditor and try again.",
+          });
+        }
+      },
+    });
+  };
+
+  const handleCompleteProgramReview = (prog: Program) => {
+    confirm({
+      title: "Complete Program Review",
+      message: `Mark "${prog.programName}" as completed?`,
+      confirmText: "Mark Completed",
+      cancelText: "Cancel",
+      variant: "primary",
+      icon: "check",
+      onConfirm: async () => {
+        try {
+          await dataProvider.completeProgramReview(prog.id);
+          Toast.show({
+            type: "success",
+            text1: "Program Completed",
+            text2: `${prog.programName} was marked as completed.`,
+          });
+          setSelectedProgram(null);
+          refreshData();
+        } catch (error: any) {
+          Toast.show({
+            type: "error",
+            text1: "Unable to complete program",
+            text2: error?.message || "Please try again.",
+          });
+        }
       },
     });
   };
 
   const isProgramView =
     activeArea === "programs" ||
-    ["all_programs", "active_programs", "pending_audit", "programs"].includes(
+    ["all_programs", "active_programs", "pending_audit", "pending_admin_review", "programs"].includes(
       activeTab,
     );
 
@@ -390,8 +474,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     label: `Awaiting approval (${pendingTeamPrograms.length})`,
                   },
                   {
-                    id: "pending_audit",
-                    label: `Pending audit (${pendingAuditPrograms.length})`,
+                    id: "pending_admin_review",
+                    label: `Awaiting completion (${pendingAdminReviewPrograms.length})`,
                   },
                   {
                     id: "programs",
@@ -692,29 +776,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </View>
         )}
 
-        {activeTab === "pending_audit" && (
+        {(activeTab === "pending_admin_review" || activeTab === "pending_audit") && (
           <View className={styles.tabSection}>
             <Text className={styles.sectionHeading}>
-              Programs awaiting audit
+              Completed programs awaiting admin review
             </Text>
-            {pendingAuditPrograms.length === 0 ? (
+            {pendingAdminReviewPrograms.length === 0 ? (
               <View className={styles.emptyBox}>
                 <Text className={styles.emptyText}>
-                  No programs are awaiting audit.
+                  No completed programs are awaiting review.
                 </Text>
               </View>
             ) : (
-              pendingAuditPrograms.map((prog) => (
-                <TouchableOpacity
-                  key={prog.id}
-                  className={styles.programCard}
-                  onPress={() => setSelectedProgram(prog)}
-                >
+              pendingAdminReviewPrograms.map((prog) => (
+                <View key={prog.id} className={styles.programCard}>
+                  <TouchableOpacity onPress={() => setSelectedProgram(prog)}>
                   <View className={styles.progHeaderRow}>
                     <Text className={styles.progTitle}>{prog.programName}</Text>
                     <View className={styles.activeTag}>
                       <Text className={styles.activeTagText}>
-                        PENDING AUDIT
+                        AWAITING ADMIN REVIEW
                       </Text>
                     </View>
                   </View>
@@ -725,7 +806,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     Controller: {prog.controllerName || "Unassigned"} · Auditor:{" "}
                     {prog.auditorName || "Unassigned"}
                   </Text>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    className={styles.approveTeamBtn}
+                    onPress={() => handleCompleteProgramReview(prog)}
+                  >
+                    <Text className={styles.approveTeamBtnText}>Mark Completed</Text>
+                  </TouchableOpacity>
+                </View>
               ))
             )}
           </View>
@@ -927,6 +1015,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <View className="min-w-0 flex-1">
                         <Text className={styles.empName}>{emp.fullName}</Text>
                         <Text className={styles.empEmail}>{emp.email}</Text>
+                        {emp.isSuperAdmin ? (
+                          <Text className="mt-1 text-[10px] font-extrabold uppercase tracking-wide text-marush-primary">
+                            Superadmin
+                          </Text>
+                        ) : null}
                       </View>
                     </View>
                     <View className={styles.empBadgeGroup}>
@@ -958,28 +1051,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </View>
 
                   <View className={styles.empActionRow}>
-                    {emp.role !== "admin" && (
-                      <TouchableOpacity
-                        className={styles.editBtn}
-                        onPress={() => handleOpenEditEmp(emp)}
-                      >
-                        <View className="flex-row items-center gap-1.5">
-                          <Pencil size={14} color={Colors.primary} />
-                          <Text className={styles.editBtnText}>Edit Role</Text>
-                        </View>
-                      </TouchableOpacity>
-                    )}
-                    {emp.role !== "admin" && (
-                      <TouchableOpacity
-                        className={styles.deleteBtn}
-                        onPress={() => handleDeleteEmployee(emp)}
-                      >
-                        <View className="flex-row items-center gap-1.5">
-                          <Trash2 size={14} color={Colors.danger} />
-                          <Text className={styles.deleteBtnText}>Delete</Text>
-                        </View>
-                      </TouchableOpacity>
-                    )}
+                    {!emp.isSuperAdmin &&
+                      (emp.role !== "admin" || currentUser.isSuperAdmin) && (
+                        <TouchableOpacity
+                          className={styles.editBtn}
+                          onPress={() => handleOpenEditEmp(emp)}
+                        >
+                          <View className="flex-row items-center gap-1.5">
+                            <Pencil size={14} color={Colors.primary} />
+                            <Text className={styles.editBtnText}>Edit Role</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                    {emp.id !== currentUser.id && ((emp.role !== "admin" && !emp.isSuperAdmin) ||
+                      (currentUser.isSuperAdmin &&
+                        (emp.role === "admin" || emp.isSuperAdmin))) ? (
+                        <TouchableOpacity
+                          className={styles.deleteBtn}
+                          onPress={() => handleDeleteEmployee(emp)}
+                        >
+                          <View className="flex-row items-center gap-1.5">
+                            <Trash2 size={14} color={Colors.danger} />
+                            <Text className={styles.deleteBtnText}>
+                              {emp.id === currentUser.id ? "Delete My Account" : "Delete"}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ) : null}
                   </View>
                 </View>
               ))
@@ -1028,7 +1126,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <View>
                 <Text className={styles.subHeading}>Pending program teams</Text>
                 <Text className={styles.sectionCaption}>
-                  Start approved teams and assign an auditor
+                  Approve program requests and start field teams
                 </Text>
               </View>
               {pendingTeamPrograms.length > 0 && (
@@ -1060,13 +1158,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {prog.teamMemberIds.length} members
                   </Text>
                   <TouchableOpacity
-                    className={styles.approveTeamBtn}
+                    className="mt-3 rounded-xl border border-marush-primary px-3 py-2.5"
                     onPress={() => handleOpenTeamApproval(prog)}
+                  >
+                    <Text className="text-center text-xs font-bold text-marush-primary">
+                      {prog.auditorId ? "Change Auditor" : "Assign Auditor"}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text className={styles.progMeta}>
+                    Auditor: {prog.auditorName || "Not assigned"}
+                  </Text>
+                  <TouchableOpacity
+                    className={`${styles.approveTeamBtn} mt-2 ${!prog.auditorId ? "opacity-40" : ""}`}
+                    disabled={!prog.auditorId}
+                    onPress={() => handleApproveAndStartProgram(prog)}
                   >
                     <View className="flex-row items-center justify-center gap-2">
                       <ShieldCheck size={15} color={Colors.white} />
                       <Text className={styles.approveTeamBtnText}>
-                        Assign Auditor & Start Program
+                        Approve & Start Program
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1552,52 +1662,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </Modal>
       )}
 
-      {/* Auditor Assignment Modal */}
-      {approvingProgram && (
+      {/* Add / Edit Employee Modal */}
+      {programForAuditorAssignment && (
         <Modal visible transparent animationType="fade">
           <View className={styles.modalOverlay}>
             <View className={styles.modalCard}>
-              <Text className={styles.modalTitle}>
-                Approve Team & Assign Auditor
-              </Text>
+              <Text className={styles.modalTitle}>Assign Program Auditor</Text>
               <Text className={styles.modalSub}>
-                {approvingProgram.programName}
+                {programForAuditorAssignment.programName}
               </Text>
-              <Text className={styles.auditorSelectLabel}>
-                Select Program Auditor:
-              </Text>
-              <View className={styles.auditorList}>
-                {auditors.map((aud) => (
-                  <TouchableOpacity
-                    key={aud.id}
-                    className={`${styles.auditorItem} ${selectedAuditorId === aud.id ? styles.auditorItemActive : ""}`}
-                    onPress={() => setSelectedAuditorId(aud.id)}
-                  >
-                    <Text
-                      className={`${styles.auditorItemText} ${selectedAuditorId === aud.id ? styles.auditorItemTextActive : ""}`}
+              <ScrollView className="my-4 max-h-72">
+                {availableAuditors.length === 0 ? (
+                  <Text className={styles.emptyText}>
+                    There are no approved program auditors to assign.
+                  </Text>
+                ) : (
+                  availableAuditors.map((auditor) => (
+                    <TouchableOpacity
+                      key={auditor.id}
+                      className={`mb-2 rounded-xl border p-3 ${selectedAuditorId === auditor.id ? "border-marush-primary bg-marush-primary-subtle" : "border-marush-border bg-white"}`}
+                      onPress={() => setSelectedAuditorId(auditor.id)}
                     >
-                      {aud.fullName}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text className="font-bold text-marush-text">
+                        {auditor.fullName}
+                      </Text>
+                      <Text className="mt-1 text-xs text-marush-muted">
+                        {auditor.email}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
               <View className={styles.modalBtnRow}>
                 <TouchableOpacity
                   className={styles.cancelModalBtn}
-                  onPress={() => setApprovingProgram(null)}
+                  onPress={() => setProgramForAuditorAssignment(null)}
                 >
                   <Text className={styles.cancelModalBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className={styles.confirmModalBtn}
-                  onPress={handleConfirmTeamApproval}
+                  className={`${styles.confirmModalBtn} ${!selectedAuditorId || savingAuditor ? "opacity-50" : ""}`}
+                  disabled={!selectedAuditorId || savingAuditor}
+                  onPress={saveAuditorAssignment}
                 >
-                  <View className="flex-row items-center justify-center gap-1.5">
-                    <ClipboardCheck size={15} color={Colors.white} />
-                    <Text className={styles.confirmModalBtnText}>
-                      Start Program
-                    </Text>
-                  </View>
+                  <Text className={styles.confirmModalBtnText}>
+                    {savingAuditor ? "Saving..." : "Save Auditor"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1651,7 +1761,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     "employee",
                     "program_controller",
                     "program_auditor",
-                    "admin",
+                    ...(currentUser.isSuperAdmin ? ["admin" as UserRole] : []),
                   ] as UserRole[]
                 ).map((r) => (
                   <TouchableOpacity

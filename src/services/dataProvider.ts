@@ -140,7 +140,7 @@ const mockStore = {
 
   getActiveEmployeeIds: (): string[] => {
     const activePrograms = programsDb.filter(
-      (p) => p.status === "active" || p.status === "pending_audit",
+      (p) => p.status === "active",
     );
     const occupiedIds = new Set<string>();
     activePrograms.forEach((p) => {
@@ -186,12 +186,20 @@ const mockStore = {
   ): Program | null => {
     const idx = programsDb.findIndex((p) => p.id === programId);
     if (idx === -1) return null;
-    const auditor = usersDb.find((u) => u.id === auditorId);
+    const auditor = usersDb.find(
+      (user) =>
+        user.id === auditorId &&
+        user.role === "program_auditor" &&
+        user.status === "approved",
+    );
+    if (!auditor) {
+      throw new Error("Assign an approved program auditor before approval.");
+    }
     programsDb[idx] = {
       ...programsDb[idx],
       status: "active",
-      auditorId,
-      auditorName: auditor?.fullName || "Assigned Auditor",
+      auditorId: auditor.id,
+      auditorName: auditor.fullName,
     };
     return programsDb[idx];
   },
@@ -204,7 +212,7 @@ const mockStore = {
     if (idx === -1) return null;
     programsDb[idx] = {
       ...programsDb[idx],
-      status: "pending_audit",
+      status: "pending_admin_review",
       completionMetrics: metrics,
       completedAt: new Date().toISOString(),
     };
@@ -224,6 +232,36 @@ const mockStore = {
       auditorRemarks: remarks,
       auditScore: score,
       auditedAt: new Date().toISOString(),
+    };
+    return programsDb[idx];
+  },
+
+  completeProgramReview: (programId: string): Program | null => {
+    const idx = programsDb.findIndex((p) => p.id === programId);
+    if (idx === -1) return null;
+    if (!programsDb[idx].auditorId) {
+      throw new Error("Assign a program auditor before approving this program.");
+    }
+    programsDb[idx] = { ...programsDb[idx], status: "completed" };
+    return programsDb[idx];
+  },
+
+  assignProgramAuditor: (
+    programId: string,
+    auditor: UserProfile,
+  ): Program | null => {
+    const idx = programsDb.findIndex((p) => p.id === programId);
+    if (idx === -1) return null;
+    if (programsDb[idx].status !== "pending_approval") {
+      throw new Error("Only a program awaiting admin approval can be assigned.");
+    }
+    if (auditor.role !== "program_auditor" || auditor.status !== "approved") {
+      throw new Error("Only approved program auditors can be assigned.");
+    }
+    programsDb[idx] = {
+      ...programsDb[idx],
+      auditorId: auditor.id,
+      auditorName: auditor.fullName,
     };
     return programsDb[idx];
   },
@@ -248,6 +286,7 @@ function mapProfileRow(
     email: row.email,
     fullName: row.full_name,
     role: row.role,
+    isSuperAdmin: row.is_super_admin,
     requestedRole: row.requested_role || undefined,
     status: row.status,
     phone: row.phone || undefined,
@@ -563,6 +602,7 @@ export const dataProvider = {
           email: user.email,
           full_name: user.fullName,
           role: user.role,
+          is_super_admin: false,
           status: user.status,
           phone: user.phone || null,
           employee_code: user.employeeCode || null,
@@ -600,11 +640,17 @@ export const dataProvider = {
     if (isSupabaseConfigured) {
       const { data: targetUser } = await getSupabaseClient()
         .from("profiles")
-        .select("role")
+        .select("role, is_super_admin")
         .eq("id", id)
         .maybeSingle();
 
-      if (targetUser?.role === "admin" && role !== "admin") {
+      const isCurrentSuperAdmin =
+        mockStore.getCurrentUser()?.isSuperAdmin === true;
+      if (
+        targetUser?.is_super_admin ||
+        ((targetUser?.role === "admin" || role === "admin") &&
+          !isCurrentSuperAdmin)
+      ) {
         throw new Error("Administrator role cannot be changed. Contact the developer for assistance.");
       }
 
@@ -618,7 +664,12 @@ export const dataProvider = {
       if (data) return mapProfileRow(data);
     }
     const target = mockStore.getUserById(id);
-    if (target?.role === "admin" && role !== "admin") {
+    const isCurrentSuperAdmin = mockStore.getCurrentUser()?.isSuperAdmin === true;
+    if (
+      target?.isSuperAdmin ||
+      ((target?.role === "admin" || role === "admin") &&
+        !isCurrentSuperAdmin)
+    ) {
       throw new Error("Administrator role cannot be changed. Contact the developer for assistance.");
     }
     return backendFailure(() => mockStore.updateUserRole(id, role));
@@ -639,27 +690,40 @@ export const dataProvider = {
   },
 
   deleteUser: async (id: string): Promise<boolean> => {
+    const currentUser = mockStore.getCurrentUser();
+    if (currentUser?.id === id && currentUser.isSuperAdmin) {
+      throw new Error("The superadmin account cannot delete itself.");
+    }
     if (isSupabaseConfigured) {
-      // Guard: fetch profile to check if it's an admin before attempting delete
-      const { data: targetUser } = await getSupabaseClient()
-        .from("profiles")
-        .select("role, email")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (targetUser?.role === "admin") {
-        throw new Error("Administrator accounts cannot be deleted. Contact the developer for assistance.");
+      const supabase = getSupabaseClient();
+      const deletingCurrentUser = currentUser?.id === id;
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { profileId: id },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.deleted) {
+        throw new Error("The account could not be deleted.");
       }
 
-      const { error } = await getSupabaseClient()
-        .from("profiles")
-        .delete()
-        .eq("id", id);
-      if (error) throw new Error(error.message);
-      return !error;
+      if (deletingCurrentUser) {
+        const { error: signOutError } = await supabase.auth.signOut({
+          scope: "local",
+        });
+        mockStore.setCurrentUser(null);
+        if (signOutError) {
+          console.warn(
+            "[Auth] Deleted account but could not clear local session:",
+            signOutError.message,
+          );
+        }
+      }
+      return true;
     }
     const target = mockStore.getUserById(id);
-    if (target?.role === "admin") {
+    if (
+      (target?.role === "admin" || target?.isSuperAdmin) &&
+      !mockStore.getCurrentUser()?.isSuperAdmin
+    ) {
       throw new Error("Administrator accounts cannot be deleted. Contact the developer for assistance.");
     }
     return backendFailure(() => mockStore.deleteUser(id));
@@ -779,15 +843,22 @@ export const dataProvider = {
     programId: string,
     auditorId: string,
   ): Promise<Program | null> => {
+    const auditor = await dataProvider.getUserById(auditorId);
+    if (!auditor || auditor.role !== "program_auditor" || auditor.status !== "approved") {
+      throw new Error("Assign an approved program auditor before approval.");
+    }
     if (isSupabaseConfigured) {
       const { data, error } = await getSupabaseClient()
         .from("programs")
-        .update({ status: "active", auditor_id: auditorId })
+        .update({ status: "active" })
         .eq("id", programId)
+        .eq("status", "pending_approval")
+        .eq("auditor_id", auditorId)
         .select()
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (data) return mapProgramRow(data);
+      throw new Error("Assign an auditor before approving this program.");
     }
     return backendFailure(() =>
       mockStore.approveProgramAndStart(programId, auditorId),
@@ -802,7 +873,7 @@ export const dataProvider = {
       const { data, error } = await getSupabaseClient()
         .from("programs")
         .update({
-          status: "pending_audit",
+          status: "pending_admin_review",
           completion_metrics: metrics,
           completed_at: new Date().toISOString(),
         })
@@ -815,6 +886,29 @@ export const dataProvider = {
     return backendFailure(() =>
       mockStore.submitProgramCompletion(programId, metrics),
     );
+  },
+
+  assignProgramAuditor: async (
+    programId: string,
+    auditorId: string,
+  ): Promise<Program | null> => {
+    const auditor = await dataProvider.getUserById(auditorId);
+    if (!auditor || auditor.role !== "program_auditor" || auditor.status !== "approved") {
+      throw new Error("Only approved program auditors can be assigned.");
+    }
+    if (isSupabaseConfigured) {
+      const { data, error } = await getSupabaseClient()
+        .from("programs")
+        .update({ auditor_id: auditorId })
+        .eq("id", programId)
+        .eq("status", "pending_approval")
+        .select(`*, auditor:profiles!programs_auditor_id_fkey(full_name)`)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("This program is no longer awaiting admin approval.");
+      return mapProgramRow(data);
+    }
+    return backendFailure(() => mockStore.assignProgramAuditor(programId, auditor));
   },
 
   submitAuditRemarks: async (
@@ -889,13 +983,29 @@ export const dataProvider = {
     };
   },
 
+  completeProgramReview: async (programId: string): Promise<Program | null> => {
+    if (isSupabaseConfigured) {
+      const { data, error } = await getSupabaseClient()
+        .from("programs")
+        .update({ status: "completed" })
+        .eq("id", programId)
+        .in("status", ["pending_admin_review", "pending_audit"])
+        .select()
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data) return mapProgramRow(data);
+      return null;
+    }
+    return backendFailure(() => mockStore.completeProgramReview(programId));
+  },
+
   // --- Dynamic Availability Filter ---
   getActiveEmployeeIds: async (): Promise<string[]> => {
     if (isSupabaseConfigured) {
       const { data: activeProgs, error } = await getSupabaseClient()
         .from("programs")
         .select("id, controller_id, program_members(user_id)")
-        .in("status", ["active", "pending_audit"]);
+        .eq("status", "active");
       if (error) throw new Error(error.message);
       const occupied = new Set<string>();
       (activeProgs || []).forEach((p: any) => {

@@ -113,7 +113,7 @@ export const ProgramControllerDashboard: React.FC<
       emp.email.toLowerCase().includes(empSearchQuery.toLowerCase()),
   );
 
-  // End Program / Send to Auditor Modal
+  // End Program / Submit to Admin Modal
   const [endingProgram, setEndingProgram] = useState<Program | null>(null);
   const [birdsVaccinated, setBirdsVaccinated] = useState("");
   const [dosagePerBird, setDosagePerBird] = useState(
@@ -389,7 +389,7 @@ export const ProgramControllerDashboard: React.FC<
           Toast.show({
             type: "success",
             text1: "Program Submitted to Admin",
-            text2: `${newProg.programName} sent for admin review and auditor assignment.`,
+            text2: `${newProg.programName} sent for admin approval.`,
           });
 
           // Reset Form
@@ -437,9 +437,9 @@ export const ProgramControllerDashboard: React.FC<
     if (!endingProgram) return;
 
     confirm({
-      title: "Complete Program & Notify Auditor",
-      message: `Finalize vaccination records for "${endingProgram.programName}" (${birdsVaccinated || endingProgram.flockSize} birds) and forward to Program Auditor for audit sign-off?`,
-      confirmText: "Send to Auditor",
+      title: "Complete Program & Submit to Admin",
+      message: `Finalize vaccination records for "${endingProgram.programName}" (${birdsVaccinated || endingProgram.flockSize} birds) and submit them to Admin for review?`,
+      confirmText: "Submit to Admin",
       cancelText: "Back",
       variant: "primary",
       icon: "send",
@@ -461,8 +461,8 @@ export const ProgramControllerDashboard: React.FC<
 
           Toast.show({
             type: "success",
-            text1: "Program Ended & Submitted",
-            text2: "Details forwarded to Program Auditor for remarks.",
+            text1: "Program Submitted to Admin",
+            text2: "The completed program is now awaiting admin review.",
           });
 
           setEndingProgram(null);
@@ -559,7 +559,7 @@ export const ProgramControllerDashboard: React.FC<
                 ["all", "All Statuses"],
                 ["active", "Active In Field"],
                 ["pending_approval", "Awaiting Approval"],
-                ["pending_audit", "Awaiting Audit"],
+                ["pending_admin_review", "Awaiting Admin Review"],
                 ["completed", "Completed"],
               ] as const
             ).map(([filter, label]) => (
@@ -654,12 +654,13 @@ export const ProgramControllerDashboard: React.FC<
                     myPrograms.filter(
                       (p) =>
                         p.status === "pending_approval" ||
+                        p.status === "pending_admin_review" ||
                         p.status === "pending_audit",
                     ).length
                   }
                 </Text>
                 <Text className="mt-0.5 text-xs text-slate-500">
-                  Awaiting Admin or Auditor
+                  Awaiting Admin review
                 </Text>
               </View>
             </View>
@@ -762,7 +763,7 @@ export const ProgramControllerDashboard: React.FC<
                       <View className="flex-row items-center justify-center gap-2">
                         <Send size={15} color={Colors.white} />
                         <Text className="text-xs font-bold text-white tracking-tight">
-                          End Program & Submit to Auditor
+                          End Program & Submit to Admin
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -771,17 +772,15 @@ export const ProgramControllerDashboard: React.FC<
                   {prog.status === "pending_approval" && (
                     <View className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
                       <Text className="text-xs font-semibold text-amber-800">
-                        Submitted to Admin. Awaiting approval and Auditor
-                        assignment.
+                        Submitted to Admin. Awaiting approval.
                       </Text>
                     </View>
                   )}
 
-                  {prog.status === "pending_audit" && (
+                  {(prog.status === "pending_admin_review" || prog.status === "pending_audit") && (
                     <View className="rounded-2xl border border-teal-200 bg-teal-50/70 p-3">
                       <Text className="text-xs font-semibold text-teal-800">
-                        Vaccination completed. Awaiting Auditor inspection and
-                        remarks.
+                        Vaccination completed. Awaiting Admin review.
                       </Text>
                     </View>
                   )}
@@ -1363,7 +1362,7 @@ export const ProgramControllerDashboard: React.FC<
         )}
       </ScrollView>
 
-      {/* End Program / Send to Auditor Modal */}
+      {/* End Program / Submit to Admin Modal */}
       {endingProgram && (
         <Modal visible transparent animationType="fade">
           <View className={styles.modalOverlay}>
@@ -1487,7 +1486,7 @@ export const ProgramControllerDashboard: React.FC<
                     <View className="flex-row items-center justify-center gap-2">
                       <Send size={15} color={Colors.white} />
                       <Text className={styles.confirmModalBtnText}>
-                        Send to Auditor
+                        Submit to Admin
                       </Text>
                     </View>
                   )}

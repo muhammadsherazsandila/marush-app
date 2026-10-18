@@ -16,6 +16,7 @@ const statusColors: Record<Program['status'], string> = {
   pending_approval: '#AF741A',
   active: '#2D766D',
   pending_audit: '#4B71A4',
+  pending_admin_review: '#4B71A4',
   completed: '#397A61',
   cancelled: '#B84C4C',
 };

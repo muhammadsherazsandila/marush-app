@@ -5,7 +5,7 @@
 // Enum types matching Supabase custom types
 export type UserRole = 'admin' | 'program_controller' | 'employee' | 'program_auditor';
 export type UserStatus = 'pending' | 'approved' | 'rejected';
-export type ProgramStatus = 'draft' | 'pending_approval' | 'active' | 'pending_audit' | 'completed' | 'cancelled';
+export type ProgramStatus = 'draft' | 'pending_approval' | 'active' | 'pending_audit' | 'pending_admin_review' | 'completed' | 'cancelled';
 
 // ---- Profile ----
 export interface UserProfile {
@@ -14,6 +14,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: UserRole;
+  isSuperAdmin?: boolean;
   requestedRole?: UserRole;
   status: UserStatus;
   phone?: string;
@@ -169,6 +170,7 @@ export interface Database {
           email: string;
           full_name: string;
           role: UserRole;
+          is_super_admin: boolean;
           requested_role: UserRole | null;
           status: UserStatus;
           phone: string | null;
@@ -183,6 +185,7 @@ export interface Database {
           email: string;
           full_name: string;
           role?: UserRole;
+          is_super_admin?: boolean;
           requested_role?: UserRole | null;
           status?: UserStatus;
           phone?: string | null;
@@ -197,6 +200,7 @@ export interface Database {
           email?: string;
           full_name?: string;
           role?: UserRole;
+          is_super_admin?: boolean;
           requested_role?: UserRole | null;
           status?: UserStatus;
           phone?: string | null;

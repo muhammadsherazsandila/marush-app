@@ -246,6 +246,13 @@ export default function App() {
     });
   };
 
+  const handleCurrentAccountDeleted = () => {
+    setCurrentUser(null);
+    setActiveTab('overview');
+    setSelectedProgram(null);
+    setShowNotifications(false);
+  };
+
   const handleTabChange = (tab: WorkspaceTab) => {
     setShowNotifications(false);
     setSelectedProgram(null);
@@ -257,7 +264,7 @@ export default function App() {
 
     switch (currentUser.role) {
       case 'admin':
-        return <AdminDashboard currentUser={currentUser} activeArea={tab} />;
+        return <AdminDashboard currentUser={currentUser} activeArea={tab} onSelfDeleted={handleCurrentAccountDeleted} />;
       case 'program_controller':
         return <ProgramControllerDashboard currentUser={currentUser} activeArea={tab} />;
       case 'program_auditor':
@@ -330,7 +337,7 @@ export default function App() {
               ) : activeTab === 'profile' ? (
                 <ProfileScreen user={currentUser} onLogout={handleLogout} />
               ) : activeTab === 'employees' && currentUser.role === 'admin' ? (
-                <AdminDashboard currentUser={currentUser} activeArea="employees" />
+                <AdminDashboard currentUser={currentUser} activeArea="employees" onSelfDeleted={handleCurrentAccountDeleted} />
               ) : activeTab === 'overview' ? (
                 <OperationsHome
                   currentUser={currentUser}
