@@ -4,7 +4,7 @@ import {
   ChevronUp,
   ShieldCheck,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -14,10 +14,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Svg, { ClipPath, Defs, Path, Image as SvgImage } from "react-native-svg";
+import Svg, {
+  Defs,
+  LinearGradient,
+  Rect,
+  Stop,
+  Image as SvgImage,
+} from "react-native-svg";
 import Toast from "react-native-toast-message";
 import { MarushLogo } from "../components/MarushLogo";
-import { Colors } from "../constants/colors";
+import { Colors, Radii, Shadows, Spacing, Type } from "../constants/design";
 import { dataProvider } from "../services";
 import { UserProfile, UserRole } from "../types";
 
@@ -26,7 +32,7 @@ interface AuthScreenProps {
   onRegisteredPending: (user: UserProfile) => void;
 }
 
-type RequestedDesignation = Exclude<UserRole, "admin">;
+type RequestedDesignation = Exclude<UserRole, "admin" | "employee">;
 
 const DESIGNATIONS: {
   value: RequestedDesignation;
@@ -34,19 +40,14 @@ const DESIGNATIONS: {
   desc: string;
 }[] = [
   {
-    value: "employee",
-    label: "Field Specialist (Vaccinator)",
-    desc: "Execute field programs & report logs",
-  },
-  {
     value: "program_controller",
     label: "Program Controller",
-    desc: "Plan schedules, assign teams & submit",
+    desc: "Plan vaccination schedules & submit SOP reports",
   },
   {
     value: "program_auditor",
     label: "Program Auditor",
-    desc: "Inspect vaccination quality & verify flocks",
+    desc: "Inspect quality & audit cold chain compliance",
   },
 ];
 
@@ -55,14 +56,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onRegisteredPending,
 }) => {
   const [designation, setDesignation] =
-    useState<RequestedDesignation>("employee");
+    useState<RequestedDesignation>("program_controller");
   const [designationOpen, setDesignationOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = useCallback(async () => {
+    if (loading) return;
     setLoading(true);
+
     try {
       const { user, error } = await dataProvider.signInWithGoogle(designation);
+
       if (error) {
         const isLocalhostPreviewError = error.startsWith(
           "Mobile browser preview is on localhost.",
@@ -71,28 +75,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           type: "error",
           text1: isLocalhostPreviewError
             ? "Open the app in Expo Go"
-            : "Google sign-in failed",
+            : "Authentication failed",
           text2: isLocalhostPreviewError
             ? "Use the LAN QR code, or sign in from the deployed HTTPS app."
             : error,
         });
-        setLoading(false);
         return;
       }
 
-      const authenticatedUser = user || dataProvider.getCurrentUser();
-      if (!authenticatedUser) {
-        setLoading(false);
-        return;
-      }
+      const authenticatedUser = user ?? dataProvider.getCurrentUser();
+      if (!authenticatedUser) return;
 
       if (authenticatedUser.status === "rejected") {
         Toast.show({
           type: "error",
           text1: "Access denied",
-          text2: "Contact your administrator for assistance.",
+          text2: "Contact your Marush administrator.",
         });
-        setLoading(false);
         return;
       }
 
@@ -100,221 +99,403 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         Toast.show({
           type: "info",
           text1: "Account under review",
-          text2: "Your account was sent to an administrator for approval.",
+          text2: "Your request was sent to a Marush administrator.",
         });
-        setLoading(false);
         onRegisteredPending(authenticatedUser);
         return;
       }
 
       Toast.show({
         type: "success",
-        text1: "Welcome back",
+        text1: "Authorized",
         text2: `Signed in as ${authenticatedUser.fullName}`,
       });
-      setLoading(false);
       onLoginSuccess(authenticatedUser);
-    } catch (error: any) {
-      setLoading(false);
+    } catch (err: any) {
       Toast.show({
         type: "error",
-        text1: "Google sign-in failed",
-        text2:
-          error?.message || "Please try again or contact your administrator.",
+        text1: "Authentication failed",
+        text2: err?.message ?? "Please contact your Marush administrator.",
       });
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [loading, designation, onLoginSuccess, onRegisteredPending]);
+
+  const selectedDesignation = DESIGNATIONS.find((o) => o.value === designation);
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-50"
-      contentContainerClassName="flex-grow"
+      style={{ flex: 1, backgroundColor: Colors.surface }}
+      contentContainerStyle={{ flexGrow: 1 }}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <View className="flex-1 bg-slate-50">
-        {/* Header Art Background */}
-        <View className="h-[400px] overflow-hidden bg-slate-50">
-          <Svg
-            width="100%"
-            height="100%"
-            viewBox="0 0 460 270"
+      {/* ============================================================ */}
+      {/* BACKGROUND — photo as texture, darkened + gradient overlay    */}
+      {/* ============================================================ */}
+      <View
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      >
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox="0 0 400 800"
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <Defs>
+            <LinearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={Colors.surface} stopOpacity="0.55" />
+              <Stop
+                offset="0.45"
+                stopColor={Colors.surface}
+                stopOpacity="0.88"
+              />
+              <Stop offset="1" stopColor={Colors.surface} stopOpacity="1" />
+            </LinearGradient>
+            <LinearGradient id="glow" x1="0.5" y1="0" x2="0.5" y2="1">
+              <Stop offset="0" stopColor={Colors.accent} stopOpacity="0.12" />
+              <Stop offset="1" stopColor={Colors.accent} stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+          <SvgImage
+            href={require("../../assets/bg.jpg")}
+            x="0"
+            y="0"
+            width="400"
+            height="800"
             preserveAspectRatio="xMidYMid slice"
-            pointerEvents="none"
-            className="absolute inset-0"
+          />
+          <Rect x="0" y="0" width="400" height="800" fill="url(#overlay)" />
+          <Rect x="0" y="0" width="400" height="400" fill="url(#glow)" />
+        </Svg>
+      </View>
+
+      {/* ============================================================ */}
+      {/* CONTENT                                                      */}
+      {/* ============================================================ */}
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: Spacing["2xl"],
+          paddingTop: Spacing["5xl"],
+          paddingBottom: Spacing["3xl"],
+        }}
+      >
+        {/* Brand mark */}
+        <View style={{ alignItems: "center" }}>
+          <MarushLogo size="md" variant="mark" theme="dark" />
+        </View>
+
+        {/* Display heading */}
+        <Text
+          style={{
+            marginTop: Spacing["4xl"],
+            textAlign: "center",
+            color: Colors.textPrimary,
+            ...Type.display,
+          }}
+        >
+          Marush Technical Portal
+        </Text>
+
+        {/* Subhead pill */}
+        <View
+          style={{
+            marginTop: Spacing.md,
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: Spacing.sm,
+              borderRadius: Radii.pill,
+              paddingHorizontal: Spacing.md,
+              paddingVertical: Spacing.xs + 2,
+              backgroundColor: Colors.accentSubtle,
+              borderWidth: 1,
+              borderColor: Colors.accentBorder,
+            }}
           >
-            <Defs>
-              <ClipPath id="headerPhotoClip">
-                <Path d="M0 0H460V138C383 176 321 161 229 166C144 170 78 193 0 236Z" />
-              </ClipPath>
-            </Defs>
-            <SvgImage
-              href={require("../../assets/bg.jpg")}
-              x="0"
-              y="0"
-              width="460"
-              height="270"
-              preserveAspectRatio="xMidYMid slice"
-              clipPath="url(#headerPhotoClip)"
-            />
-          </Svg>
-          <View className="absolute left-6 top-8">
-            <MarushLogo size="sm" variant="mark" />
+            <ShieldCheck size={12} color={Colors.accent} strokeWidth={2.4} />
+            <Text
+              style={{
+                ...Type.eyebrow,
+                letterSpacing: 1.5,
+                color: Colors.accent,
+              }}
+            >
+              Authorized Personnel Only
+            </Text>
           </View>
         </View>
 
-        {/* Elevated Card Form */}
-        <View className="mx-auto -mt-20 w-full max-w-[480px] px-5 pb-10">
-          <View className="rounded-3xl border border-black/[0.07] bg-white p-7 shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-            <View className="items-center">
-              <Text className="text-[26px] font-black tracking-tight text-slate-900">
-                Welcome to Marush
-              </Text>
-              <Text className="mt-1 text-center text-sm font-medium text-slate-500">
-                Poultry health, vaccination & biosecurity intelligence
-              </Text>
-              <View className="mt-3.5 flex-row items-center gap-1.5 rounded-full border border-black/[0.06] bg-slate-50 px-3 py-1">
-                <ShieldCheck
-                  size={13}
-                  color={Colors.primary}
-                  strokeWidth={2.4}
-                />
-                <Text className="text-[10px] font-bold uppercase tracking-[1.4px] text-marush-primary">
-                  Enterprise SSO Access
-                </Text>
-              </View>
-            </View>
+        {/* Tagline */}
+        <Text
+          style={{
+            marginTop: Spacing.lg,
+            textAlign: "center",
+            color: Colors.textSecondary,
+            ...Type.caption,
+            lineHeight: 19,
+          }}
+        >
+          CEVA's Exclusive Distributor in Pakistan{"\n"}
+          Hatchery Vaccination · Technical Services
+        </Text>
 
-            <View className="mt-6 gap-4 z-10">
-              {/* Designation Selector */}
-              <View
-                className="gap-2"
-                style={
-                  designationOpen
-                    ? { position: "relative", zIndex: 10, elevation: 8 }
-                    : undefined
-                }
-              >
-                <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Select Requested Role
-                </Text>
-                <TouchableOpacity
-                  className="h-14 flex-row items-center justify-between rounded-2xl border border-black/[0.08] bg-slate-50/80 px-4 transition-all"
-                  onPress={() => setDesignationOpen((open) => !open)}
-                  disabled={loading}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Designation: ${DESIGNATIONS.find((option) => option.value === designation)?.label}`}
-                  accessibilityState={{ expanded: designationOpen }}
-                  activeOpacity={0.8}
-                >
-                  <View className="min-w-0 flex-1 justify-center">
-                    <Text className="text-sm font-bold text-slate-900">
-                      {
-                        DESIGNATIONS.find(
-                          (option) => option.value === designation,
-                        )?.label
-                      }
-                    </Text>
-                  </View>
-                  {designationOpen ? (
-                    <ChevronUp size={18} color={Colors.primary} />
-                  ) : (
-                    <ChevronDown size={18} color={Colors.primary} />
-                  )}
-                </TouchableOpacity>
+        {/* ======================================================== */}
+        {/* FROSTED GLASS CARD                                        */}
+        {/* ======================================================== */}
+        <View
+          style={{
+            marginTop: Spacing["4xl"],
+            padding: Spacing.xl,
+            borderRadius: Radii.xl,
+            backgroundColor: Colors.surfaceCard,
+            borderWidth: 1,
+            borderColor: Colors.border,
+            ...(Platform.OS === "web"
+              ? ({ backdropFilter: "blur(24px)" } as any)
+              : {}),
+          }}
+        >
+          <Text
+            style={{
+              ...Type.eyebrow,
+              letterSpacing: 1.3,
+              color: Colors.textTertiary,
+            }}
+          >
+            Operational Role
+          </Text>
 
-                {designationOpen && (
-                  <View
-                    className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-xl"
+          {/* Role selector trigger */}
+          <TouchableOpacity
+            style={{
+              marginTop: Spacing.sm + 2,
+              height: 52,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: Spacing.lg,
+              borderRadius: Radii.md,
+              backgroundColor: Colors.surfaceInput,
+              borderWidth: 1,
+              borderColor: Colors.borderSubtle,
+            }}
+            onPress={() => setDesignationOpen((v) => !v)}
+            disabled={loading}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Role: ${selectedDesignation?.label}`}
+            accessibilityState={{ expanded: designationOpen }}
+          >
+            <Text
+              style={{
+                flex: 1,
+                ...Type.bodyStrong,
+                color: Colors.textPrimary,
+              }}
+              numberOfLines={1}
+            >
+              {selectedDesignation?.label}
+            </Text>
+            {designationOpen ? (
+              <ChevronUp size={17} color={Colors.accent} strokeWidth={2.2} />
+            ) : (
+              <ChevronDown
+                size={17}
+                color={Colors.textSecondary}
+                strokeWidth={2.2}
+              />
+            )}
+          </TouchableOpacity>
+
+          {/* Dropdown panel */}
+          {designationOpen && (
+            <View
+              style={{
+                marginTop: Spacing.sm,
+                overflow: "hidden",
+                borderRadius: Radii.md,
+                backgroundColor: Colors.surfaceElevated,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                ...Shadows.card,
+              }}
+            >
+              {DESIGNATIONS.map((option, i) => {
+                const selected = option.value === designation;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
                     style={{
-                      position: "absolute",
-                      top: 72,
-                      left: 0,
-                      right: 0,
-                      zIndex: 20,
-                      elevation: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingHorizontal: Spacing.lg,
+                      paddingVertical: Spacing.md + 2,
+                      borderBottomWidth: i < DESIGNATIONS.length - 1 ? 1 : 0,
+                      borderBottomColor: Colors.borderSubtle,
+                      backgroundColor: selected
+                        ? Colors.accentSubtle
+                        : "transparent",
                     }}
+                    onPress={() => {
+                      setDesignation(option.value);
+                      setDesignationOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
                   >
-                    {DESIGNATIONS.map((option) => (
-                      <TouchableOpacity
-                        key={option.value}
-                        className={`min-h-[54px] flex-row items-center justify-between border-b border-black/[0.05] px-4 py-2.5 last:border-b-0 ${
-                          designation === option.value
-                            ? "bg-marush-primary-subtle/80"
-                            : "bg-white hover:bg-slate-50"
-                        }`}
-                        onPress={() => {
-                          setDesignation(option.value);
-                          setDesignationOpen(false);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          selected: designation === option.value,
+                    <View style={{ flex: 1, paddingRight: Spacing.md }}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: selected ? "700" : "600",
+                          color: selected ? Colors.accent : Colors.textPrimary,
                         }}
                       >
-                        <View className="min-w-0 flex-1 pr-2">
-                          <Text
-                            className={`text-sm ${
-                              designation === option.value
-                                ? "font-bold text-marush-primary"
-                                : "font-semibold text-slate-800"
-                            }`}
-                          >
-                            {option.label}
-                          </Text>
-                        </View>
-                        {designation === option.value && (
-                          <View className="h-6 w-6 items-center justify-center rounded-full bg-marush-primary">
-                            <Check size={14} color="#FFFFFF" strokeWidth={3} />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* Continue with Google button */}
-              <TouchableOpacity
-                className={`min-h-[52px] items-center justify-center rounded-2xl bg-marush-primary px-4 shadow-[0_2px_8px_rgba(0,79,66,0.2)] transition-all ${
-                  loading ? "opacity-70" : ""
-                }`}
-                onPress={handleGoogleSignIn}
-                disabled={loading}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                {...(Platform.OS === "web"
-                  ? ({
-                      style: {
-                        transition:
-                          "transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease-out",
-                      },
-                    } as any)
-                  : {})}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <View className="flex-row items-center justify-center gap-3">
-                    <View className="h-6 w-6 items-center justify-center rounded-full bg-white p-0.5">
-                      <Image
-                        source={require("../../assets/google-g-logo.png")}
-                        className="h-4 w-4"
-                        style={{ width: 16, height: 16 }}
-                        resizeMode="contain"
-                        accessible={false}
-                      />
+                        {option.label}
+                      </Text>
+                      <Text
+                        style={{
+                          marginTop: 2,
+                          fontSize: 11,
+                          lineHeight: 15,
+                          color: Colors.textTertiary,
+                        }}
+                      >
+                        {option.desc}
+                      </Text>
                     </View>
-                    <Text className="text-[15px] font-bold text-white tracking-tight">
-                      Continue with Google
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                    {selected && (
+                      <View
+                        style={{
+                          height: 20,
+                          width: 20,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: Radii.pill,
+                          backgroundColor: Colors.accent,
+                        }}
+                      >
+                        <Check size={12} color={Colors.white} strokeWidth={3} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          )}
 
-            <Text className="mt-3 text-center text-xs leading-relaxed text-slate-400">
-              Authorized personnel only. Sessions are monitored for operational
-              integrity.
+          {/* Primary CTA */}
+          <TouchableOpacity
+            style={{
+              marginTop: Spacing.xl,
+              minHeight: 50,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: Radii.md,
+              backgroundColor: loading ? "rgba(1,156,223,0.4)" : Colors.accent,
+              ...(loading ? {} : Shadows.accentGlow),
+            }}
+            onPress={handleGoogleSignIn}
+            disabled={loading}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+            accessibilityState={{ disabled: loading, busy: loading }}
+          >
+            {loading ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: Spacing.sm + 2,
+                }}
+              >
+                <View
+                  style={{
+                    height: 20,
+                    width: 20,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: Radii.pill,
+                    backgroundColor: Colors.white,
+                  }}
+                >
+                  <Image
+                    source={require("../../assets/google-g-logo.png")}
+                    style={{ width: 14, height: 14 }}
+                    resizeMode="contain"
+                    accessible={false}
+                  />
+                </View>
+                <Text
+                  style={{
+                    ...Type.bodyStrong,
+                    fontWeight: "700",
+                    color: Colors.white,
+                  }}
+                >
+                  Continue with Google
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <View
+          style={{
+            marginTop: "auto",
+            alignItems: "center",
+            paddingTop: Spacing["3xl"],
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "center",
+              fontSize: 10,
+              lineHeight: 15,
+              color: Colors.textTertiary,
+            }}
+          >
+            Sessions are monitored in accordance with{"\n"}
+            CEVA Animal Health SOPs & operational integrity standards.
+          </Text>
+          <View
+            style={{
+              marginTop: Spacing.md,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: Spacing.xs + 2,
+            }}
+          >
+            <View
+              style={{
+                height: 4,
+                width: 4,
+                borderRadius: Radii.pill,
+                backgroundColor: Colors.accent,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: "500",
+                color: Colors.textTertiary,
+              }}
+            >
+              Marush Pvt. Ltd. · Lahore, Pakistan
             </Text>
           </View>
         </View>

@@ -1,28 +1,34 @@
-import React from 'react';
-import { View, Text, Image } from 'react-native';
+// components/MarushLogo.tsx
+import React from "react";
+import { Image, Text, View } from "react-native";
+import { Colors } from "../constants/design";
 
 interface MarushLogoProps {
-  size?: 'sm' | 'nav' | 'md' | 'lg';
-  variant?: 'full' | 'mark';
+  size?: "sm" | "nav" | "md" | "lg";
+  variant?: "full" | "mark";
   framed?: boolean;
   showSubtitle?: boolean;
+  theme?: "light" | "dark";
 }
 
-const logoSource = require('../../assets/logo-transparent.png');
+const logoSource = require("../../assets/logo-transparent.png");
 const logoAspectRatio = 230 / 219;
 
 export const MarushLogo: React.FC<MarushLogoProps> = ({
-  size = 'md',
-  variant = 'full',
+  size = "md",
+  variant = "full",
   framed = true,
   showSubtitle = true,
+  theme = "light",
 }) => {
   const dimensions = {
-    sm: { imageHeight: 30, frameClass: 'h-10 w-10', subClass: 'text-[10px]', cornerClass: 'rounded-lg' },
-    nav: { imageHeight: 42, frameClass: 'h-12 w-12', subClass: 'text-[10px]', cornerClass: 'rounded-xl' },
-    md: { imageHeight: 64, frameClass: 'h-20 w-20', subClass: 'text-xs', cornerClass: 'rounded-xl' },
-    lg: { imageHeight: 112, frameClass: 'h-32 w-32', subClass: 'text-sm', cornerClass: 'rounded-2xl' },
+    sm: { imageHeight: 30, frame: 40, subSize: 10, corner: 10 },
+    nav: { imageHeight: 42, frame: 48, subSize: 10, corner: 12 },
+    md: { imageHeight: 64, frame: 80, subSize: 12, corner: 12 },
+    lg: { imageHeight: 112, frame: 128, subSize: 14, corner: 16 },
   }[size];
+
+  const isDark = theme === "dark";
 
   const logoImage = (
     <Image
@@ -38,10 +44,19 @@ export const MarushLogo: React.FC<MarushLogoProps> = ({
   );
 
   return (
-    <View className="items-center justify-center">
+    <View style={{ alignItems: "center", justifyContent: "center" }}>
       {framed ? (
         <View
-          className={`${dimensions.frameClass} items-center justify-center border border-marush-border bg-white shadow-md ${dimensions.cornerClass}`}
+          style={{
+            width: dimensions.frame,
+            height: dimensions.frame,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: dimensions.corner,
+            borderWidth: 1,
+            borderColor: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)",
+            backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+          }}
         >
           {logoImage}
         </View>
@@ -49,8 +64,17 @@ export const MarushLogo: React.FC<MarushLogoProps> = ({
         logoImage
       )}
 
-      {variant !== 'mark' && showSubtitle && (
-        <Text className={`mt-2 max-w-[260px] text-center font-medium text-marush-muted ${dimensions.subClass}`}>
+      {variant !== "mark" && showSubtitle && (
+        <Text
+          style={{
+            marginTop: 8,
+            maxWidth: 260,
+            textAlign: "center",
+            fontSize: dimensions.subSize,
+            fontWeight: "500",
+            color: isDark ? Colors.textSecondary : Colors.textTertiary,
+          }}
+        >
           Exclusive Sole Distributor of Ceva Animal Health in Pakistan
         </Text>
       )}

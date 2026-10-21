@@ -17,6 +17,10 @@ import type {
   UserStatus,
 } from "../types";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
+import {
+  validateAuditorAssignment,
+  validateControllerProgramCreation,
+} from "./programGuards";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -125,11 +129,18 @@ const mockStore = {
     return usersDb[idx];
   },
 
-  updateUserRole: (id: string, role: UserRole): UserProfile | null => {
+  updateEmployeeName: (id: string, fullName: string): UserProfile => {
     const idx = usersDb.findIndex((u) => u.id === id);
-    if (idx === -1) return null;
-    usersDb[idx] = { ...usersDb[idx], role };
+    if (idx === -1) throw new Error("Employee not found.");
+    if (usersDb[idx].role !== "employee") {
+      throw new Error("Only field employees can have their name updated.");
+    }
+    usersDb[idx] = { ...usersDb[idx], fullName, updatedAt: new Date().toISOString() };
     return usersDb[idx];
+  },
+
+  updateUserRole: (id: string, role: UserRole): UserProfile | null => {
+    throw new Error("Changing user roles is disabled.");
   },
 
   deleteUser: (id: string): boolean => {
@@ -168,6 +179,13 @@ const mockStore = {
   createProgram: (
     programData: Omit<Program, "id" | "createdAt" | "status">,
   ): Program => {
+    const validation = validateControllerProgramCreation(
+      programData.controllerId,
+      programsDb,
+    );
+    if (!validation.allowed) {
+      throw new Error(validation.reason);
+    }
     const newProg: Program = {
       ...programData,
       id:
@@ -194,6 +212,14 @@ const mockStore = {
     );
     if (!auditor) {
       throw new Error("Assign an approved program auditor before approval.");
+    }
+    const validation = validateAuditorAssignment(
+      programId,
+      auditorId,
+      programsDb,
+    );
+    if (!validation.allowed) {
+      throw new Error(validation.reason);
     }
     programsDb[idx] = {
       ...programsDb[idx],
@@ -258,6 +284,14 @@ const mockStore = {
     if (auditor.role !== "program_auditor" || auditor.status !== "approved") {
       throw new Error("Only approved program auditors can be assigned.");
     }
+    const validation = validateAuditorAssignment(
+      programId,
+      auditor.id,
+      programsDb,
+    );
+    if (!validation.allowed) {
+      throw new Error(validation.reason);
+    }
     programsDb[idx] = {
       ...programsDb[idx],
       auditorId: auditor.id,
@@ -283,10 +317,11 @@ function mapProfileRow(
   return {
     id: row.id,
     authUserId: row.auth_user_id || undefined,
-    email: row.email,
+    email: row.email || undefined,
     fullName: row.full_name,
     role: row.role,
     isSuperAdmin: row.is_super_admin,
+    isDeveloper: row.is_developer,
     requestedRole: row.requested_role || undefined,
     status: row.status,
     phone: row.phone || undefined,
@@ -409,7 +444,7 @@ export const dataProvider = {
   },
 
   signInWithGoogle: async (
-    requestedRole: RequestedDesignation = "employee",
+    requestedRole: RequestedDesignation = "program_controller",
   ): Promise<{ user: UserProfile | null; error: string | null }> => {
     if (isSupabaseConfigured) {
       try {
@@ -599,10 +634,11 @@ export const dataProvider = {
       const { data, error } = await getSupabaseClient()
         .from("profiles")
         .insert({
-          email: user.email,
+          email: user.email?.trim() || null,
           full_name: user.fullName,
           role: user.role,
           is_super_admin: false,
+          is_developer: false,
           status: user.status,
           phone: user.phone || null,
           employee_code: user.employeeCode || null,
@@ -621,9 +657,28 @@ export const dataProvider = {
     status: UserStatus,
   ): Promise<UserProfile | null> => {
     if (isSupabaseConfigured) {
-      const { data, error } = await getSupabaseClient()
+      const supabase = getSupabaseClient();
+      const updates: { status: UserStatus; role?: UserRole } = { status };
+
+      if (status === "approved") {
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("requested_role, role")
+          .eq("id", id)
+          .single();
+
+        if (
+          profileRow?.requested_role &&
+          (profileRow.requested_role === "program_controller" ||
+            profileRow.requested_role === "program_auditor")
+        ) {
+          updates.role = profileRow.requested_role;
+        }
+      }
+
+      const { data, error } = await supabase
         .from("profiles")
-        .update({ status })
+        .update(updates)
         .eq("id", id)
         .select()
         .single();
@@ -633,7 +688,32 @@ export const dataProvider = {
     return backendFailure(() => mockStore.updateUserStatus(id, status));
   },
 
+  updateEmployeeName: async (
+    id: string,
+    fullName: string,
+  ): Promise<UserProfile> => {
+    const trimmed = fullName.trim();
+    if (!trimmed) throw new Error("Employee name cannot be empty.");
+    if (isSupabaseConfigured) {
+      const { data, error } = await getSupabaseClient()
+        .rpc("update_employee_name", {
+          p_employee_id: id,
+          p_full_name: trimmed,
+        });
+      if (error) throw new Error(error.message);
+      if (data) return mapProfileRow(data as any);
+    }
+    return backendFailure(() => mockStore.updateEmployeeName(id, trimmed));
+  },
+
   updateUserRole: async (
+    id: string,
+    role: UserRole,
+  ): Promise<UserProfile | null> => {
+    throw new Error("Changing user roles is not permitted.");
+  },
+
+  _legacyUpdateUserRole: async (
     id: string,
     role: UserRole,
   ): Promise<UserProfile | null> => {
@@ -691,18 +771,40 @@ export const dataProvider = {
 
   deleteUser: async (id: string): Promise<boolean> => {
     const currentUser = mockStore.getCurrentUser();
-    if (currentUser?.id === id && currentUser.isSuperAdmin) {
-      throw new Error("The superadmin account cannot delete itself.");
+    if (currentUser?.id === id && (currentUser.isSuperAdmin || currentUser.isDeveloper)) {
+      throw new Error("Super user accounts cannot delete themselves.");
     }
     if (isSupabaseConfigured) {
       const supabase = getSupabaseClient();
       const deletingCurrentUser = currentUser?.id === id;
-      const { data, error } = await supabase.functions.invoke("delete-user", {
-        body: { profileId: id },
+
+      // 1. Try direct RPC delete_profile
+      let deleted = false;
+      const { data: rpcData, error: rpcError } = await supabase.rpc("delete_profile", {
+        p_profile_id: id,
       });
-      if (error) throw new Error(error.message);
-      if (!data?.deleted) {
-        throw new Error("The account could not be deleted.");
+
+      if (!rpcError && rpcData) {
+        deleted = true;
+      } else {
+        // 2. Fallback to Edge Function
+        const { data: fnData, error: fnError } = await supabase.functions.invoke("delete-user", {
+          body: { profileId: id },
+        });
+        if (!fnError && fnData?.deleted) {
+          deleted = true;
+        } else {
+          // 3. Fallback to direct table delete
+          const { error: directError } = await supabase
+            .from("profiles")
+            .delete()
+            .eq("id", id);
+          if (!directError) {
+            deleted = true;
+          } else {
+            throw new Error(directError.message || fnError?.message || rpcError?.message || "The account could not be deleted.");
+          }
+        }
       }
 
       if (deletingCurrentUser) {
@@ -717,7 +819,7 @@ export const dataProvider = {
           );
         }
       }
-      return true;
+      return deleted;
     }
     const target = mockStore.getUserById(id);
     if (
@@ -785,6 +887,14 @@ export const dataProvider = {
     >,
   ): Promise<Program> => {
     if (isSupabaseConfigured) {
+      const existingPrograms = await dataProvider.getPrograms();
+      const validation = validateControllerProgramCreation(
+        data.controllerId,
+        existingPrograms,
+      );
+      if (!validation.allowed) {
+        throw new Error(validation.reason);
+      }
       const { data: programId, error } = await getSupabaseClient().rpc(
         "create_program_with_members",
         {
@@ -847,7 +957,17 @@ export const dataProvider = {
     if (!auditor || auditor.role !== "program_auditor" || auditor.status !== "approved") {
       throw new Error("Assign an approved program auditor before approval.");
     }
+
     if (isSupabaseConfigured) {
+      const allPrograms = await dataProvider.getPrograms();
+      const validation = validateAuditorAssignment(
+        programId,
+        auditorId,
+        allPrograms,
+      );
+      if (!validation.allowed) {
+        throw new Error(validation.reason);
+      }
       const { data, error } = await getSupabaseClient()
         .from("programs")
         .update({ status: "active" })
@@ -896,7 +1016,17 @@ export const dataProvider = {
     if (!auditor || auditor.role !== "program_auditor" || auditor.status !== "approved") {
       throw new Error("Only approved program auditors can be assigned.");
     }
+
     if (isSupabaseConfigured) {
+      const allPrograms = await dataProvider.getPrograms();
+      const validation = validateAuditorAssignment(
+        programId,
+        auditorId,
+        allPrograms,
+      );
+      if (!validation.allowed) {
+        throw new Error(validation.reason);
+      }
       const { data, error } = await getSupabaseClient()
         .from("programs")
         .update({ auditor_id: auditorId })

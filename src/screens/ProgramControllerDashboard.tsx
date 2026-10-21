@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Check,
   CircleX,
   ClipboardCheck,
@@ -21,7 +22,7 @@ import {
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { useConfirmDialog } from "../components/ConfirmDialog";
-import { Colors } from "../constants/colors";
+import { Colors, Radii, Shadows, Spacing, Type } from "../constants/design";
 import { dataProvider } from "../services";
 import {
   Program,
@@ -110,7 +111,8 @@ export const ProgramControllerDashboard: React.FC<
         emp.employeeCode
           .toLowerCase()
           .includes(empSearchQuery.toLowerCase())) ||
-      emp.email.toLowerCase().includes(empSearchQuery.toLowerCase()),
+      (emp.email &&
+        emp.email.toLowerCase().includes(empSearchQuery.toLowerCase())),
   );
 
   // End Program / Submit to Admin Modal
@@ -289,6 +291,9 @@ export const ProgramControllerDashboard: React.FC<
   }, [activeArea]);
 
   const myPrograms = programs.filter((p) => p.controllerId === currentUser.id);
+  const activeIncompleteProgram = myPrograms.find(
+    (p) => p.status !== "completed" && p.status !== "cancelled",
+  );
   const visiblePrograms = myPrograms.filter(
     (p) => programFilter === "all" || p.status === programFilter,
   );
@@ -302,6 +307,14 @@ export const ProgramControllerDashboard: React.FC<
   };
 
   const handleInitiateProgram = () => {
+    if (activeIncompleteProgram) {
+      Toast.show({
+        type: "error",
+        text1: "Active Program Incomplete",
+        text2: `You already have an active program ("${activeIncompleteProgram.programName}"). Complete it before initiating a new one.`,
+      });
+      return;
+    }
     if (!programName.trim() || !hatcheryOrFarm.trim()) {
       Toast.show({
         type: "error",
@@ -481,45 +494,93 @@ export const ProgramControllerDashboard: React.FC<
   };
 
   return (
-    <View className="flex-1">
-      {/* Sub-header navigation row matching AdminDashboard */}
-      <View className="border-b border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-        <View className="mx-auto w-full max-w-[1280px] flex-row items-center px-5 md:px-8 py-0">
+    <View style={{ flex: 1, backgroundColor: Colors.surface }}>
+      {/* Top Navigation Bar */}
+      <View
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.border,
+          backgroundColor: Colors.surfaceElevated,
+        }}
+      >
+        <View
+          style={{
+            maxWidth: 1280,
+            width: "100%",
+            alignSelf: "center",
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: Spacing.xl,
+          }}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            className="min-w-0 flex-1"
-            contentContainerClassName="flex-row items-center gap-5 pr-4"
-            contentContainerStyle={{ flexGrow: 1 }}
+            contentContainerStyle={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: Spacing.xl,
+              flexGrow: 1,
+            }}
           >
             <TouchableOpacity
-              className={`border-b-2 px-1 py-4 ${activeTab === "my_programs" ? "border-marush-primary" : "border-transparent"}`}
+              style={{
+                paddingVertical: Spacing.lg,
+                borderBottomWidth: 2,
+                borderBottomColor:
+                  activeTab === "my_programs" ? Colors.accent : "transparent",
+              }}
               onPress={() => setActiveTab("my_programs")}
             >
               <Text
-                className={`text-[13px] whitespace-nowrap ${activeTab === "my_programs" ? "font-bold text-marush-primary" : "font-semibold text-slate-500"}`}
+                style={{
+                  ...Type.bodyStrong,
+                  color:
+                    activeTab === "my_programs"
+                      ? Colors.accent
+                      : Colors.textSecondary,
+                }}
               >
                 My Programs
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              className={`border-b-2 px-1 py-4 ${activeTab === "initiate" ? "border-marush-primary" : "border-transparent"}`}
+              style={{
+                paddingVertical: Spacing.lg,
+                borderBottomWidth: 2,
+                borderBottomColor:
+                  activeTab === "initiate" ? Colors.accent : "transparent",
+              }}
               onPress={() => {
                 refreshData();
                 setActiveTab("initiate");
               }}
             >
-              <View className="flex-row items-center gap-1.5">
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: Spacing.xs,
+                }}
+              >
                 <Plus
                   size={14}
                   color={
-                    activeTab === "initiate" ? Colors.primary : Colors.textMuted
+                    activeTab === "initiate"
+                      ? Colors.accent
+                      : Colors.textSecondary
                   }
                   strokeWidth={2.5}
                 />
                 <Text
-                  className={`text-[13px] whitespace-nowrap ${activeTab === "initiate" ? "font-bold text-marush-primary" : "font-semibold text-slate-500"}`}
+                  style={{
+                    ...Type.bodyStrong,
+                    color:
+                      activeTab === "initiate"
+                        ? Colors.accent
+                        : Colors.textSecondary,
+                  }}
                 >
                   Initiate Program
                 </Text>
@@ -528,16 +589,33 @@ export const ProgramControllerDashboard: React.FC<
           </ScrollView>
 
           <TouchableOpacity
-            className="ml-3 flex-row items-center gap-1.5 rounded-2xl border border-black/[0.08] bg-white px-3.5 py-2 shadow-sm transition-all active:scale-[0.97]"
             onPress={refreshData}
             disabled={loading}
+            style={{
+              marginLeft: Spacing.md,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: Spacing.xs,
+              borderRadius: Radii.md,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              backgroundColor: Colors.surfaceInput,
+              paddingHorizontal: Spacing.md,
+              paddingVertical: Spacing.sm,
+            }}
           >
             {loading ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
+              <ActivityIndicator size="small" color={Colors.accent} />
             ) : (
               <>
-                <RefreshCw size={14} color={Colors.primary} strokeWidth={2.4} />
-                <Text className="text-xs font-bold text-marush-primary">
+                <RefreshCw size={14} color={Colors.accent} strokeWidth={2.4} />
+                <Text
+                  style={{
+                    ...Type.caption,
+                    fontWeight: "700",
+                    color: Colors.accent,
+                  }}
+                >
                   Refresh
                 </Text>
               </>
@@ -546,38 +624,58 @@ export const ProgramControllerDashboard: React.FC<
         </View>
       </View>
 
-      {/* Program Status Filter Row */}
+      {/* Filter Row (Only for My Programs) */}
       {activeTab === "my_programs" && (
-        <View className="border-b border-black/[0.04] bg-white/70">
+        <View
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: Colors.borderSubtle,
+            backgroundColor: Colors.surface,
+          }}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerClassName="flex-row items-center gap-2 px-5 md:px-8 py-2.5"
+            contentContainerStyle={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: Spacing.sm,
+              paddingHorizontal: Spacing.xl,
+              paddingVertical: Spacing.md,
+            }}
           >
-            {(
-              [
-                ["all", "All Statuses"],
-                ["active", "Active In Field"],
-                ["pending_approval", "Awaiting Approval"],
-                ["pending_admin_review", "Awaiting Admin Review"],
-                ["completed", "Completed"],
-              ] as const
-            ).map(([filter, label]) => (
+            {[
+              ["all", "All Statuses"],
+              ["active", "Active In Field"],
+              ["pending_approval", "Awaiting Approval"],
+              ["pending_admin_review", "Awaiting Admin Review"],
+              ["completed", "Completed"],
+            ].map(([filter, label]) => (
               <TouchableOpacity
                 key={filter}
-                className={`rounded-full px-3.5 py-1.5 border transition-all active:scale-[0.97] ${
-                  programFilter === filter
-                    ? "border-marush-primary bg-marush-primary shadow-sm"
-                    : "border-black/[0.08] bg-white shadow-sm"
-                }`}
-                onPress={() => setProgramFilter(filter)}
+                onPress={() => setProgramFilter(filter as any)}
+                style={{
+                  paddingHorizontal: Spacing.md,
+                  paddingVertical: Spacing.xs + 2,
+                  borderRadius: Radii.pill,
+                  borderWidth: 1,
+                  borderColor:
+                    programFilter === filter ? Colors.accent : Colors.border,
+                  backgroundColor:
+                    programFilter === filter
+                      ? Colors.accentSubtle
+                      : Colors.surfaceCard,
+                }}
               >
                 <Text
-                  className={`text-xs font-semibold ${
-                    programFilter === filter
-                      ? "font-bold text-white"
-                      : "text-slate-600"
-                  }`}
+                  style={{
+                    ...Type.caption,
+                    fontWeight: programFilter === filter ? "700" : "600",
+                    color:
+                      programFilter === filter
+                        ? Colors.accent
+                        : Colors.textSecondary,
+                  }}
                 >
                   {label}
                 </Text>
@@ -587,69 +685,203 @@ export const ProgramControllerDashboard: React.FC<
         </View>
       )}
 
-      <ScrollView contentContainerClassName="mx-auto w-full max-w-[1280px] gap-5">
-        {/* Header Block */}
-        <View className="flex-row flex-wrap items-start justify-between gap-4">
-          <View className="min-w-0 flex-1">
-            <Text className="mb-1 text-[10px] font-black uppercase tracking-[1.8px] text-marush-secondary-dark">
+      <ScrollView
+        contentContainerStyle={{
+          maxWidth: 1280,
+          width: "100%",
+          alignSelf: "center",
+          padding: Spacing.xl,
+          gap: Spacing.xl,
+          paddingBottom: Spacing["5xl"],
+        }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: Spacing.lg,
+          }}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={{
+                ...Type.eyebrow,
+                color: Colors.accent,
+                marginBottom: Spacing.xs,
+              }}
+            >
               PROGRAM MANAGEMENT / CONTROLLER WORKSPACE
             </Text>
-            <Text className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
+            <Text style={{ ...Type.h1, color: Colors.textPrimary }}>
               {activeTab === "my_programs"
                 ? "Operations & Schedules"
                 : "Create New Vaccination Program"}
             </Text>
-            <Text className="mt-1 max-w-[620px] text-xs md:text-sm leading-relaxed text-slate-500">
+            <Text
+              style={{
+                ...Type.caption,
+                color: Colors.textSecondary,
+                marginTop: Spacing.sm,
+                maxWidth: 620,
+              }}
+            >
               {activeTab === "my_programs"
                 ? "Coordinate vaccination teams, monitor live field progress, and submit completed batches for quality inspection."
                 : "Configure farm details, assign certified vaccinators, schedule travel, and submit to Admin for deployment."}
             </Text>
           </View>
-          <View className="flex-row items-center gap-1.5 rounded-full border border-black/[0.06] bg-white px-3.5 py-1.5 shadow-sm">
-            <ClipboardCheck
-              size={14}
-              color={Colors.primary}
-              strokeWidth={2.5}
-            />
-            <Text className="text-xs font-bold text-marush-primary">
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: Spacing.xs,
+              paddingHorizontal: Spacing.md,
+              paddingVertical: Spacing.xs,
+              borderRadius: Radii.pill,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              backgroundColor: Colors.surfaceInput,
+            }}
+          >
+            <ClipboardCheck size={14} color={Colors.accent} strokeWidth={2.5} />
+            <Text
+              style={{
+                ...Type.caption,
+                fontWeight: "700",
+                color: Colors.accent,
+              }}
+            >
               Lead Controller
             </Text>
           </View>
         </View>
 
         {activeTab === "my_programs" ? (
-          <View className="gap-3">
+          <View style={{ gap: Spacing.md }}>
             {/* Quick Metrics Bar */}
-            <View className="flex-row flex-wrap gap-3">
-              <View className="min-w-[180px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-marush-primary">
-                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: Spacing.md,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 180,
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  backgroundColor: Colors.surfaceCard,
+                  borderLeftWidth: 4,
+                  borderLeftColor: Colors.accent,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.eyebrow,
+                    fontSize: 10,
+                    color: Colors.textTertiary,
+                  }}
+                >
                   Total Created
                 </Text>
-                <Text className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                <Text
+                  style={{
+                    ...Type.number,
+                    color: Colors.textPrimary,
+                    marginTop: Spacing.sm,
+                  }}
+                >
                   {myPrograms.length}
                 </Text>
-                <Text className="mt-0.5 text-xs text-slate-500">
+                <Text
+                  style={{
+                    ...Type.caption,
+                    color: Colors.textSecondary,
+                    marginTop: Spacing.xs,
+                  }}
+                >
                   All managed programs
                 </Text>
               </View>
 
-              <View className="min-w-[180px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-teal-600">
-                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 180,
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  backgroundColor: Colors.surfaceCard,
+                  borderLeftWidth: 4,
+                  borderLeftColor: Colors.info,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.eyebrow,
+                    fontSize: 10,
+                    color: Colors.textTertiary,
+                  }}
+                >
                   Active In Field
                 </Text>
-                <Text className="mt-2 text-3xl font-black tracking-tight text-teal-700">
+                <Text
+                  style={{
+                    ...Type.number,
+                    color: Colors.info,
+                    marginTop: Spacing.sm,
+                  }}
+                >
                   {myPrograms.filter((p) => p.status === "active").length}
                 </Text>
-                <Text className="mt-0.5 text-xs text-slate-500">
+                <Text
+                  style={{
+                    ...Type.caption,
+                    color: Colors.textSecondary,
+                    marginTop: Spacing.xs,
+                  }}
+                >
                   Currently executing
                 </Text>
               </View>
 
-              <View className="min-w-[180px] flex-1 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border-l-4 border-l-amber-500">
-                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 180,
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  backgroundColor: Colors.surfaceCard,
+                  borderLeftWidth: 4,
+                  borderLeftColor: Colors.warning,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.eyebrow,
+                    fontSize: 10,
+                    color: Colors.textTertiary,
+                  }}
+                >
                   Pending Review
                 </Text>
-                <Text className="mt-2 text-3xl font-black tracking-tight text-amber-700">
+                <Text
+                  style={{
+                    ...Type.number,
+                    color: Colors.warning,
+                    marginTop: Spacing.sm,
+                  }}
+                >
                   {
                     myPrograms.filter(
                       (p) =>
@@ -659,362 +891,844 @@ export const ProgramControllerDashboard: React.FC<
                     ).length
                   }
                 </Text>
-                <Text className="mt-0.5 text-xs text-slate-500">
+                <Text
+                  style={{
+                    ...Type.caption,
+                    color: Colors.textSecondary,
+                    marginTop: Spacing.xs,
+                  }}
+                >
                   Awaiting Admin review
                 </Text>
               </View>
             </View>
 
             {visiblePrograms.length === 0 ? (
-              <View className="items-center rounded-3xl border border-dashed border-black/[0.1] bg-white p-10">
-                <Text className="text-sm font-bold text-slate-800">
+              <View
+                style={{
+                  alignItems: "center",
+                  padding: Spacing["4xl"],
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text style={{ ...Type.bodyStrong, color: Colors.textPrimary }}>
                   {myPrograms.length === 0
                     ? "No programs initiated yet"
                     : "No programs match this filter"}
                 </Text>
-                <Text className="mt-1 max-w-[340px] text-center text-xs text-slate-500">
+                <Text
+                  style={{
+                    ...Type.caption,
+                    color: Colors.textSecondary,
+                    marginTop: Spacing.xs,
+                    textAlign: "center",
+                    maxWidth: 340,
+                  }}
+                >
                   {myPrograms.length === 0
                     ? "Start by creating your first vaccination program schedule."
                     : "Clear the filter above to view all of your programs."}
                 </Text>
                 {myPrograms.length === 0 && (
                   <TouchableOpacity
-                    className="mt-4 rounded-2xl bg-marush-primary px-4 py-2.5 shadow-sm active:scale-[0.97]"
                     onPress={() => setActiveTab("initiate")}
+                    style={{
+                      marginTop: Spacing.lg,
+                      paddingHorizontal: Spacing.lg,
+                      paddingVertical: Spacing.sm,
+                      borderRadius: Radii.md,
+                      backgroundColor: Colors.accent,
+                    }}
                   >
-                    <Text className="text-xs font-bold text-white">
+                    <Text
+                      style={{
+                        ...Type.caption,
+                        fontWeight: "700",
+                        color: Colors.white,
+                      }}
+                    >
                       Create First Program
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : (
-              visiblePrograms.map((prog) => (
-                <View
-                  key={prog.id}
-                  className="gap-3 rounded-3xl border border-black/[0.07] bg-white p-5 md:p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                >
-                  <View className="flex-row flex-wrap items-start justify-between gap-2">
-                    <View className="min-w-0 flex-1">
-                      <Text className="text-base font-bold tracking-tight text-slate-900">
-                        {prog.programName}
-                      </Text>
-                      <Text className="text-sm font-semibold text-slate-600">
-                        {prog.hatcheryOrFarmName}
-                      </Text>
-                    </View>
+              visiblePrograms.map((prog) => {
+                const statusColor =
+                  prog.status === "completed"
+                    ? Colors.success
+                    : prog.status === "active"
+                      ? Colors.info
+                      : Colors.warning;
+                return (
+                  <View
+                    key={prog.id}
+                    style={{
+                      padding: Spacing.xl,
+                      borderRadius: Radii.lg,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      backgroundColor: Colors.surfaceCard,
+                      gap: Spacing.md,
+                    }}
+                  >
                     <View
-                      className={`rounded-full px-3 py-1 ${
-                        prog.status === "completed"
-                          ? "bg-emerald-50 border border-emerald-200"
-                          : prog.status === "active"
-                            ? "bg-teal-50 border border-teal-200"
-                            : "bg-amber-50 border border-amber-200"
-                      }`}
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        justifyContent: "space-between",
+                        gap: Spacing.sm,
+                      }}
                     >
-                      <Text
-                        className={`text-[10px] font-black uppercase tracking-wider ${
-                          prog.status === "completed"
-                            ? "text-emerald-800"
-                            : prog.status === "active"
-                              ? "text-teal-800"
-                              : "text-amber-800"
-                        }`}
-                      >
-                        {prog.status.replace("_", " ").toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View className="flex-row flex-wrap items-center gap-x-6 gap-y-1.5 rounded-2xl border border-black/[0.05] bg-slate-50/80 p-3.5">
-                    <Text className="text-xs text-slate-600">
-                      Flock:{" "}
-                      <Text className="font-bold text-slate-900">
-                        {prog.flockSize.toLocaleString()}
-                      </Text>{" "}
-                      birds
-                    </Text>
-                    <Text className="text-xs text-slate-600">
-                      Team:{" "}
-                      <Text className="font-bold text-slate-900">
-                        {prog.teamMemberIds.length}
-                      </Text>{" "}
-                      vaccinators
-                    </Text>
-                    <Text className="text-xs text-slate-500">
-                      Schedule: {prog.scheduledStartDate} (
-                      {prog.scheduledStartTime} - {prog.scheduledEndTime})
-                    </Text>
-                    {prog.auditorName && (
-                      <Text className="text-xs text-slate-500">
-                        Auditor:{" "}
-                        <Text className="font-semibold text-slate-700">
-                          {prog.auditorName}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          style={{
+                            ...Type.bodyStrong,
+                            fontWeight: "700",
+                            color: Colors.textPrimary,
+                          }}
+                        >
+                          {prog.programName}
                         </Text>
-                      </Text>
-                    )}
-                  </View>
-
-                  {prog.status === "active" && (
-                    <TouchableOpacity
-                      className="mt-1 items-center rounded-2xl bg-marush-primary py-3 shadow-[0_2px_8px_rgba(0,79,66,0.18)] transition-all active:scale-[0.98]"
-                      onPress={() => handleOpenEndProgram(prog)}
-                    >
-                      <View className="flex-row items-center justify-center gap-2">
-                        <Send size={15} color={Colors.white} />
-                        <Text className="text-xs font-bold text-white tracking-tight">
-                          End Program & Submit to Admin
+                        <Text
+                          style={{
+                            ...Type.caption,
+                            color: Colors.textSecondary,
+                            marginTop: 2,
+                          }}
+                        >
+                          {prog.hatcheryOrFarmName}
                         </Text>
                       </View>
-                    </TouchableOpacity>
-                  )}
-
-                  {prog.status === "pending_approval" && (
-                    <View className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
-                      <Text className="text-xs font-semibold text-amber-800">
-                        Submitted to Admin. Awaiting approval.
-                      </Text>
-                    </View>
-                  )}
-
-                  {(prog.status === "pending_admin_review" || prog.status === "pending_audit") && (
-                    <View className="rounded-2xl border border-teal-200 bg-teal-50/70 p-3">
-                      <Text className="text-xs font-semibold text-teal-800">
-                        Vaccination completed. Awaiting Admin review.
-                      </Text>
-                    </View>
-                  )}
-
-                  {prog.status === "completed" && prog.auditorRemarks && (
-                    <View className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-3.5">
-                      <Text className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-                        Auditor Sign-off ({prog.auditorName})
-                      </Text>
-                      <Text className="mt-0.5 text-xs italic text-emerald-900">
-                        "{prog.auditorRemarks}"
-                      </Text>
-                      {prog.auditScore ? (
-                        <Text className="mt-1 text-xs font-black text-emerald-800">
-                          Quality Score: {prog.auditScore} / 100
+                      <View
+                        style={{
+                          paddingHorizontal: Spacing.md,
+                          paddingVertical: Spacing.xs,
+                          borderRadius: Radii.pill,
+                          borderWidth: 1,
+                          borderColor: `${statusColor}55`,
+                          backgroundColor: `${statusColor}1A`,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            ...Type.eyebrow,
+                            fontSize: 10,
+                            color: statusColor,
+                          }}
+                        >
+                          {prog.status.replace("_", " ").toUpperCase()}
                         </Text>
-                      ) : null}
+                      </View>
                     </View>
-                  )}
-                </View>
-              ))
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: Spacing.lg,
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                      }}
+                    >
+                      <Text
+                        style={{ ...Type.caption, color: Colors.textSecondary }}
+                      >
+                        Flock:{" "}
+                        <Text
+                          style={{
+                            fontWeight: "700",
+                            color: Colors.textPrimary,
+                          }}
+                        >
+                          {prog.flockSize.toLocaleString()}
+                        </Text>{" "}
+                        birds
+                      </Text>
+                      <Text
+                        style={{ ...Type.caption, color: Colors.textSecondary }}
+                      >
+                        Team:{" "}
+                        <Text
+                          style={{
+                            fontWeight: "700",
+                            color: Colors.textPrimary,
+                          }}
+                        >
+                          {prog.teamMemberIds.length}
+                        </Text>{" "}
+                        vaccinators
+                      </Text>
+                      <Text
+                        style={{ ...Type.caption, color: Colors.textSecondary }}
+                      >
+                        Schedule: {prog.scheduledStartDate} (
+                        {prog.scheduledStartTime})
+                      </Text>
+                    </View>
+
+                    {prog.status === "active" && (
+                      <TouchableOpacity
+                        onPress={() => handleOpenEndProgram(prog)}
+                        style={{
+                          marginTop: Spacing.sm,
+                          paddingVertical: Spacing.md,
+                          borderRadius: Radii.md,
+                          backgroundColor: Colors.accent,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: Spacing.sm,
+                          ...Shadows.accentGlow,
+                        }}
+                      >
+                        <Send size={15} color={Colors.white} />
+                        <Text
+                          style={{
+                            ...Type.caption,
+                            fontWeight: "700",
+                            color: Colors.white,
+                          }}
+                        >
+                          End Program & Submit to Admin
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {prog.status === "pending_approval" && (
+                      <View
+                        style={{
+                          padding: Spacing.md,
+                          borderRadius: Radii.md,
+                          backgroundColor: Colors.warningSubtle,
+                          borderWidth: 1,
+                          borderColor: Colors.warningBorder,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            ...Type.caption,
+                            fontWeight: "600",
+                            color: Colors.warning,
+                          }}
+                        >
+                          Submitted to Admin. Awaiting approval.
+                        </Text>
+                      </View>
+                    )}
+
+                    {(prog.status === "pending_admin_review" ||
+                      prog.status === "pending_audit") && (
+                      <View
+                        style={{
+                          padding: Spacing.md,
+                          borderRadius: Radii.md,
+                          backgroundColor: Colors.infoSubtle,
+                          borderWidth: 1,
+                          borderColor: Colors.infoBorder,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            ...Type.caption,
+                            fontWeight: "600",
+                            color: Colors.info,
+                          }}
+                        >
+                          Vaccination completed. Awaiting Admin review.
+                        </Text>
+                      </View>
+                    )}
+
+                    {prog.status === "completed" && prog.auditorRemarks && (
+                      <View
+                        style={{
+                          marginTop: Spacing.xs,
+                          padding: Spacing.md,
+                          borderRadius: Radii.md,
+                          backgroundColor: Colors.successSubtle,
+                          borderWidth: 1,
+                          borderColor: Colors.successBorder,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            ...Type.eyebrow,
+                            fontSize: 9,
+                            color: Colors.success,
+                          }}
+                        >
+                          Auditor Sign-off ({prog.auditorName})
+                        </Text>
+                        <Text
+                          style={{
+                            ...Type.caption,
+                            fontStyle: "italic",
+                            color: Colors.textPrimary,
+                            marginTop: Spacing.xs,
+                          }}
+                        >
+                          "{prog.auditorRemarks}"
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
             )}
           </View>
         ) : (
-          <View className="gap-5">
-            <View className="rounded-3xl bg-[#163B43] p-5 shadow-[0_6px_24px_rgba(21,42,53,0.16)]">
-              <View className="flex-row flex-wrap items-start justify-between gap-4">
-                <View className="min-w-0 flex-1">
-                  <View className="flex-row items-center gap-2">
-                    <View className="rounded-xl bg-white/10 p-2">
-                      <ClipboardCheck size={18} color="#B8E6D8" />
+          // ── INITIATE PROGRAM TAB ─────────────────────────────────
+          <View style={{ gap: Spacing.xl }}>
+            {/* Draft Status Banner */}
+            <View
+              style={{
+                padding: Spacing.xl,
+                borderRadius: Radii.lg,
+                backgroundColor: Colors.surfaceElevated,
+                borderWidth: 1,
+                borderColor: Colors.accentBorder,
+                ...Shadows.card,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: Spacing.md,
+                }}
+              >
+                <View style={{ flex: 1, minWidth: 280 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: Spacing.sm,
+                    }}
+                  >
+                    <View
+                      style={{
+                        padding: Spacing.sm,
+                        borderRadius: Radii.sm,
+                        backgroundColor: Colors.accentSubtle,
+                      }}
+                    >
+                      <ClipboardCheck size={18} color={Colors.accent} />
                     </View>
-                    <Text className="text-xs font-black uppercase tracking-[1.5px] text-[#B8E6D8]">
+                    <Text style={{ ...Type.eyebrow, color: Colors.accent }}>
                       New field schedule
                     </Text>
                   </View>
-                  <Text className="mt-3 text-xl font-black tracking-tight text-white md:text-2xl">
+                  <Text
+                    style={{
+                      ...Type.h2,
+                      color: Colors.textPrimary,
+                      marginTop: Spacing.md,
+                    }}
+                  >
                     Build a vaccination program
                   </Text>
-                  <Text className="mt-1 max-w-[620px] text-xs leading-relaxed text-slate-200/75 md:text-sm">
+                  <Text
+                    style={{
+                      ...Type.caption,
+                      color: Colors.textSecondary,
+                      marginTop: Spacing.xs,
+                      maxWidth: 620,
+                    }}
+                  >
                     Add what is known now. Timing and operational details can be
                     completed later without losing your work.
                   </Text>
                 </View>
-                <View className="rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3">
-                  <View className="flex-row items-center gap-2">
-                    <Clock3 size={14} color="#B8E6D8" />
-                    <Text className="text-[10px] font-black uppercase tracking-wider text-[#B8E6D8]">
+                <View
+                  style={{
+                    padding: Spacing.md,
+                    borderRadius: Radii.md,
+                    backgroundColor: Colors.surfaceInput,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    alignSelf: "flex-start",
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: Spacing.sm,
+                    }}
+                  >
+                    <Clock3 size={14} color={Colors.accent} />
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.accent,
+                      }}
+                    >
                       {draftSavedAt
                         ? `Saved ${new Date(draftSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                         : "Not saved yet"}
                     </Text>
                   </View>
-                  <Text className="mt-1 text-[11px] text-slate-200/70">
+                  <Text
+                    style={{
+                      ...Type.caption,
+                      color: Colors.textTertiary,
+                      marginTop: 2,
+                    }}
+                  >
                     Private draft on this device
-                  </Text>
-                </View>
-              </View>
-              <View className="mt-5 flex-row flex-wrap gap-2">
-                <View className="rounded-full bg-white/10 px-3 py-1.5">
-                  <Text className="text-[10px] font-bold text-white/80">
-                    1. Site & team
-                  </Text>
-                </View>
-                <View className="rounded-full bg-white/10 px-3 py-1.5">
-                  <Text className="text-[10px] font-bold text-white/80">
-                    2. Schedule
-                  </Text>
-                </View>
-                <View className="rounded-full bg-white/10 px-3 py-1.5">
-                  <Text className="text-[10px] font-bold text-white/80">
-                    3. Review & submit
                   </Text>
                 </View>
               </View>
             </View>
 
-            <View className="gap-5">
-              {/* SECTION 1: Farm Details */}
-              <View className="mb-2 mt-1 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+            {activeIncompleteProgram && (
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.warning,
+                  backgroundColor: "rgba(245, 158, 11, 0.08)",
+                  gap: Spacing.sm,
+                  marginBottom: Spacing.lg,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: Spacing.sm,
+                  }}
+                >
+                  <AlertTriangle size={18} color={Colors.warning} />
+                  <Text
+                    style={{
+                      ...Type.bodyStrong,
+                      color: Colors.warning,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Ongoing Program in Progress
+                  </Text>
+                </View>
+                <Text style={{ ...Type.body, color: Colors.textSecondary }}>
+                  You currently have an active program:{" "}
+                  <Text style={{ color: Colors.textPrimary, fontWeight: "700" }}>
+                    {activeIncompleteProgram.programName}
+                  </Text>{" "}
+                  ({activeIncompleteProgram.status.replace(/_/g, " ").toUpperCase()}). A controller cannot initiate a new program until the current program is completed.
+                </Text>
+              </View>
+            )}
+
+            {/* Form Sections */}
+            <View style={{ gap: Spacing.xl }}>
+              {/* 1. Farm Details */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.h3,
+                    color: Colors.accent,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
                   1. Farm Details
                 </Text>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Program Title *</Text>
-                  <TextInput
-                    className={styles.input}
-                    placeholder="e.g. Broiler ND & IBD Complete Immunization"
-                    placeholderTextColor={Colors.textMuted}
-                    value={programName}
-                    onChangeText={setProgramName}
-                  />
-                </View>
-
-                <View className={`${styles.inputGroup} mt-2`}>
-                  <Text className={styles.label}>Farm / Hatchery Name *</Text>
-                  <TextInput
-                    className={styles.input}
-                    placeholder="e.g. Jadeed Poultry Farm Sector 4"
-                    placeholderTextColor={Colors.textMuted}
-                    value={hatcheryOrFarm}
-                    onChangeText={setHatcheryOrFarm}
-                  />
-                </View>
-
-                <View className={`${styles.inputGroup} mt-2`}>
-                  <Text className={styles.label}>Farm / Hatchery Address</Text>
-                  <TextInput
-                    className={styles.input}
-                    placeholder="e.g. 12-Km Depalpur Road, Okara"
-                    placeholderTextColor={Colors.textMuted}
-                    value={farmAddress}
-                    onChangeText={setFarmAddress}
-                  />
-                </View>
-
-                <View className={`${styles.inputGroup} mt-2`}>
-                  <Text className={styles.label}>
-                    Owner / Farm / Hatchery Manager Name
-                  </Text>
-                  <TextInput
-                    className={styles.input}
-                    placeholder="e.g. Ch. Muhammad Akram"
-                    placeholderTextColor={Colors.textMuted}
-                    value={farmManagerName}
-                    onChangeText={setFarmManagerName}
-                  />
+                <View style={{ gap: Spacing.md }}>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Program Title *
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. Broiler ND & IBD Complete Immunization"
+                      placeholderTextColor={Colors.textTertiary}
+                      value={programName}
+                      onChangeText={setProgramName}
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Farm / Hatchery Name *
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. Jadeed Poultry Farm Sector 4"
+                      placeholderTextColor={Colors.textTertiary}
+                      value={hatcheryOrFarm}
+                      onChangeText={setHatcheryOrFarm}
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Farm / Hatchery Address
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. 12-Km Depalpur Road, Okara"
+                      placeholderTextColor={Colors.textTertiary}
+                      value={farmAddress}
+                      onChangeText={setFarmAddress}
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Owner / Farm Manager Name
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      placeholder="e.g. Ch. Muhammad Akram"
+                      placeholderTextColor={Colors.textTertiary}
+                      value={farmManagerName}
+                      onChangeText={setFarmManagerName}
+                    />
+                  </View>
                 </View>
               </View>
 
-              {/* SECTION 2: Team Details */}
-              <View className="mb-2 rounded-2xl border border-black/[0.07] p-4 bg-white">
-                <View className="mb-2.5 flex-row items-center justify-between">
-                  <Text className="text-xs font-black uppercase tracking-wider text-marush-primary">
+              {/* 2. Team Allocation */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: Spacing.lg,
+                  }}
+                >
+                  <Text style={{ ...Type.h3, color: Colors.accent }}>
                     2. Team Allocation
                   </Text>
-                  <View className="flex-row items-center gap-2">
-                    <Text className="text-xs font-bold text-slate-500">
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: Spacing.sm,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        ...Type.caption,
+                        fontWeight: "700",
+                        color: Colors.textSecondary,
+                      }}
+                    >
                       {selectedEmpIds.length} Selected
                     </Text>
-                    <Text className="text-slate-300">•</Text>
-                    <Text className="text-xs font-bold text-marush-secondary-dark">
+                    <Text style={{ ...Type.caption, color: Colors.border }}>
+                      •
+                    </Text>
+                    <Text
+                      style={{
+                        ...Type.caption,
+                        fontWeight: "700",
+                        color: Colors.accent,
+                      }}
+                    >
                       {availableEmployees.length} Available
                     </Text>
                   </View>
                 </View>
 
-                <View className="mb-3 rounded-2xl bg-white p-3 border border-black/[0.06] shadow-sm">
-                  <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <View
+                  style={{
+                    padding: Spacing.md,
+                    borderRadius: Radii.md,
+                    backgroundColor: Colors.surfaceInput,
+                    borderWidth: 1,
+                    borderColor: Colors.borderSubtle,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
+                  <Text
+                    style={{
+                      ...Type.eyebrow,
+                      fontSize: 9,
+                      color: Colors.textTertiary,
+                    }}
+                  >
                     Assigned Controller (Creator)
                   </Text>
-                  <Text className="mt-0.5 text-xs font-bold text-slate-900">
+                  <Text
+                    style={{
+                      ...Type.bodyStrong,
+                      color: Colors.textPrimary,
+                      marginTop: Spacing.xs,
+                    }}
+                  >
                     {currentUser.fullName}{" "}
-                    <Text className="font-mono text-slate-400">
+                    <Text
+                      style={{ fontWeight: "400", color: Colors.textSecondary }}
+                    >
                       ({currentUser.employeeCode || "Lead Controller"})
                     </Text>
                   </Text>
                 </View>
 
-                <View className="gap-2">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <View style={{ gap: Spacing.sm }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                      }}
+                    >
                       Select Vaccinators * ({selectedEmpIds.length} assigned)
                     </Text>
                     {selectedEmpIds.length > 0 && (
                       <TouchableOpacity onPress={() => setSelectedEmpIds([])}>
-                        <Text className="text-xs font-semibold text-red-600">
+                        <Text
+                          style={{
+                            ...Type.caption,
+                            fontWeight: "600",
+                            color: Colors.danger,
+                          }}
+                        >
                           Clear selection
                         </Text>
                       </TouchableOpacity>
                     )}
                   </View>
 
-                  {/* Search Bar for Vaccinators */}
-                  <View className="flex-row items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-3 shadow-sm">
-                    <Search size={15} color={Colors.textMuted} />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: Spacing.sm,
+                      paddingHorizontal: Spacing.md,
+                      borderRadius: Radii.md,
+                      borderWidth: 1,
+                      borderColor: Colors.borderSubtle,
+                      backgroundColor: Colors.surfaceInput,
+                    }}
+                  >
+                    <Search size={15} color={Colors.textTertiary} />
                     <TextInput
-                      className="min-w-0 flex-1 py-2 text-xs text-slate-800"
+                      style={{
+                        flex: 1,
+                        paddingVertical: Spacing.md,
+                        ...Type.body,
+                        color: Colors.textPrimary,
+                      }}
                       placeholder="Search by name, staff ID code, or email..."
-                      placeholderTextColor={Colors.textMuted}
+                      placeholderTextColor={Colors.textTertiary}
                       value={empSearchQuery}
                       onChangeText={setEmpSearchQuery}
                     />
                     {empSearchQuery.length > 0 && (
                       <TouchableOpacity onPress={() => setEmpSearchQuery("")}>
-                        <CircleX size={15} color={Colors.textMuted} />
+                        <CircleX size={15} color={Colors.textTertiary} />
                       </TouchableOpacity>
                     )}
                   </View>
 
-                  {/* Vertically Scrollable List with Max Height */}
                   {availableEmployees.length === 0 ? (
-                    <View className="my-1 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5">
-                      <Text className="text-xs italic text-amber-800">
+                    <View
+                      style={{
+                        marginTop: Spacing.xs,
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.warningSubtle,
+                        borderWidth: 1,
+                        borderColor: Colors.warningBorder,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          ...Type.caption,
+                          fontStyle: "italic",
+                          color: Colors.warning,
+                        }}
+                      >
                         All field vaccinators are currently engaged in active
                         programs.
                       </Text>
                     </View>
                   ) : filteredAvailableEmployees.length === 0 ? (
-                    <View className="my-1 items-center rounded-2xl border border-dashed border-black/[0.1] bg-white p-6">
-                      <Text className="text-xs font-semibold text-slate-600">
+                    <View
+                      style={{
+                        marginTop: Spacing.xs,
+                        alignItems: "center",
+                        padding: Spacing.lg,
+                        borderRadius: Radii.md,
+                        borderWidth: 1,
+                        borderStyle: "dashed",
+                        borderColor: Colors.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          ...Type.caption,
+                          fontWeight: "600",
+                          color: Colors.textSecondary,
+                        }}
+                      >
                         No vaccinators found matching "{empSearchQuery}"
                       </Text>
-                      <Text className="mt-0.5 text-[11px] text-slate-400">
+                      <Text
+                        style={{
+                          ...Type.caption,
+                          color: Colors.textTertiary,
+                          marginTop: Spacing.xs,
+                        }}
+                      >
                         Try searching with a different name or staff code.
                       </Text>
                     </View>
                   ) : (
-                    <View className="max-h-[260px] rounded-2xl border border-black/[0.08] bg-white shadow-inner overflow-hidden">
+                    <View
+                      style={{
+                        maxHeight: 260,
+                        borderRadius: Radii.md,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        backgroundColor: Colors.surface,
+                        overflow: "hidden",
+                      }}
+                    >
                       <ScrollView
                         nestedScrollEnabled
-                        showsVerticalScrollIndicator={true}
-                        contentContainerClassName="p-2 gap-1.5"
+                        contentContainerStyle={{
+                          padding: Spacing.sm,
+                          gap: Spacing.sm,
+                        }}
                       >
                         {filteredAvailableEmployees.map((emp) => {
                           const isSelected = selectedEmpIds.includes(emp.id);
                           return (
                             <TouchableOpacity
                               key={emp.id}
-                              className={`flex-row items-center justify-between rounded-xl px-3.5 py-2.5 transition-all active:scale-[0.99] border ${
-                                isSelected
-                                  ? "border-marush-primary/30 bg-marush-primary-subtle"
-                                  : "border-transparent bg-slate-50/80 hover:bg-slate-100"
-                              }`}
                               onPress={() => toggleSelectEmployee(emp.id)}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                paddingHorizontal: Spacing.md,
+                                paddingVertical: Spacing.sm,
+                                borderRadius: Radii.md,
+                                borderWidth: 1,
+                                borderColor: isSelected
+                                  ? Colors.accentBorder
+                                  : "transparent",
+                                backgroundColor: isSelected
+                                  ? Colors.accentSubtle
+                                  : Colors.surfaceInput,
+                              }}
                             >
-                              <View className="min-w-0 flex-1 flex-row items-center gap-3">
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: Spacing.md,
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
                                 <View
-                                  className={`h-8 w-8 items-center justify-center rounded-lg border ${
-                                    isSelected
-                                      ? "border-marush-primary bg-marush-primary"
-                                      : "border-black/[0.1] bg-white"
-                                  }`}
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    borderRadius: Radii.sm,
+                                    borderWidth: 1,
+                                    borderColor: isSelected
+                                      ? Colors.accent
+                                      : Colors.border,
+                                    backgroundColor: isSelected
+                                      ? Colors.accent
+                                      : Colors.surfaceCard,
+                                  }}
                                 >
                                   {isSelected ? (
                                     <Check
@@ -1023,7 +1737,13 @@ export const ProgramControllerDashboard: React.FC<
                                       strokeWidth={2.6}
                                     />
                                   ) : (
-                                    <Text className="text-xs font-bold text-slate-500">
+                                    <Text
+                                      style={{
+                                        ...Type.eyebrow,
+                                        fontSize: 10,
+                                        color: Colors.textSecondary,
+                                      }}
+                                    >
                                       {emp.fullName
                                         .trim()
                                         .slice(0, 1)
@@ -1031,30 +1751,53 @@ export const ProgramControllerDashboard: React.FC<
                                     </Text>
                                   )}
                                 </View>
-                                <View className="min-w-0 flex-1">
+                                <View style={{ flex: 1, minWidth: 0 }}>
                                   <Text
-                                    className={`text-xs font-bold ${isSelected ? "text-marush-primary" : "text-slate-900"}`}
+                                    style={{
+                                      ...Type.bodyStrong,
+                                      fontWeight: "700",
+                                      color: isSelected
+                                        ? Colors.accent
+                                        : Colors.textPrimary,
+                                    }}
                                   >
                                     {emp.fullName}
                                   </Text>
-                                  <Text className="text-[11px] font-mono text-slate-400">
-                                    ID: {emp.employeeCode || "Not assigned"} •{" "}
-                                    {emp.email}
+                                  <Text
+                                    style={{
+                                      ...Type.caption,
+                                      fontFamily: "monospace",
+                                      color: Colors.textTertiary,
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    ID: {emp.employeeCode || "Not assigned"}
+                                    {emp.email ? ` • ${emp.email}` : ""}
                                   </Text>
                                 </View>
                               </View>
-
                               <View
-                                className={`rounded-full px-2.5 py-0.5 border ${
-                                  isSelected
-                                    ? "bg-marush-primary border-marush-primary"
-                                    : "bg-white border-black/[0.08]"
-                                }`}
+                                style={{
+                                  paddingHorizontal: Spacing.sm,
+                                  paddingVertical: 2,
+                                  borderRadius: Radii.pill,
+                                  borderWidth: 1,
+                                  borderColor: isSelected
+                                    ? Colors.accent
+                                    : Colors.border,
+                                  backgroundColor: isSelected
+                                    ? Colors.accent
+                                    : Colors.surfaceCard,
+                                }}
                               >
                                 <Text
-                                  className={`text-[10px] font-bold ${
-                                    isSelected ? "text-white" : "text-slate-600"
-                                  }`}
+                                  style={{
+                                    ...Type.eyebrow,
+                                    fontSize: 9,
+                                    color: isSelected
+                                      ? Colors.white
+                                      : Colors.textSecondary,
+                                  }}
                                 >
                                   {isSelected ? "ASSIGNED" : "TAP TO ADD"}
                                 </Text>
@@ -1068,112 +1811,285 @@ export const ProgramControllerDashboard: React.FC<
                 </View>
               </View>
 
-              {/* SECTION 3: Program Details */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+              {/* 3. Program Details */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.h3,
+                    color: Colors.accent,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
                   3. Program Details
                 </Text>
-
-                <View className={styles.row}>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Date of Vaccination *</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: Spacing.md,
+                  }}
+                >
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Date of Vaccination *
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={startDate}
                       onChangeText={setStartDate}
                       placeholder="YYYY-MM-DD"
+                      placeholderTextColor={Colors.textTertiary}
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Time of Vaccination *</Text>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Time of Vaccination *
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={startTime}
                       onChangeText={setStartTime}
                       placeholder="08:00 AM"
+                      placeholderTextColor={Colors.textTertiary}
                     />
                   </View>
                 </View>
-
-                <View className={`${styles.row} mt-2`}>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Estimated End Date</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: Spacing.md,
+                    marginTop: Spacing.md,
+                  }}
+                >
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Estimated End Date
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={endDate}
                       onChangeText={setEndDate}
                       placeholder="YYYY-MM-DD"
+                      placeholderTextColor={Colors.textTertiary}
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Estimated End Time</Text>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Estimated End Time
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={endTime}
                       onChangeText={setEndTime}
                       placeholder="04:00 PM"
+                      placeholderTextColor={Colors.textTertiary}
                     />
                   </View>
                 </View>
               </View>
 
-              {/* SECTION 4: Bird Details */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
-                  4. Bird Details (Number of Birds Categorized)
+              {/* 4. Bird Details */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.h3,
+                    color: Colors.accent,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
+                  4. Bird Details
                 </Text>
-
-                <View className={styles.row}>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Breeder (B)</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: Spacing.md,
+                  }}
+                >
+                  <View style={{ flex: 1, minWidth: 100 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Breeder (B)
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       placeholder="e.g. 5000"
-                      placeholderTextColor={Colors.textMuted}
+                      placeholderTextColor={Colors.textTertiary}
                       value={birdBreeder}
                       onChangeText={setBirdBreeder}
                       keyboardType="numeric"
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Layer (L)</Text>
+                  <View style={{ flex: 1, minWidth: 100 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Layer (L)
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       placeholder="e.g. 15000"
-                      placeholderTextColor={Colors.textMuted}
+                      placeholderTextColor={Colors.textTertiary}
                       value={birdLayer}
                       onChangeText={setBirdLayer}
                       keyboardType="numeric"
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Broiler (Br)</Text>
+                  <View style={{ flex: 1, minWidth: 100 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Broiler (Br)
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       placeholder="e.g. 30000"
-                      placeholderTextColor={Colors.textMuted}
+                      placeholderTextColor={Colors.textTertiary}
                       value={birdBroiler}
                       onChangeText={setBirdBroiler}
                       keyboardType="numeric"
                     />
                   </View>
                 </View>
-
-                <View className={`${styles.inputGroup} mt-2`}>
-                  <Text className={styles.label}>
-                    Total Flock Size (Birds) *
+                <View style={{ marginTop: Spacing.md }}>
+                  <Text
+                    style={{
+                      ...Type.eyebrow,
+                      fontSize: 10,
+                      color: Colors.textSecondary,
+                      marginBottom: Spacing.xs,
+                    }}
+                  >
+                    Total Flock Size *
                   </Text>
                   <TextInput
-                    className={styles.input}
+                    style={{
+                      padding: Spacing.md,
+                      borderRadius: Radii.md,
+                      backgroundColor: Colors.surfaceInput,
+                      borderWidth: 1,
+                      borderColor: Colors.borderSubtle,
+                      color: Colors.textPrimary,
+                    }}
                     placeholder={
-                      parseInt(birdBreeder || "0", 10) +
-                        parseInt(birdLayer || "0", 10) +
-                        parseInt(birdBroiler || "0", 10) >
+                      parseInt(birdBreeder || "0") +
+                        parseInt(birdLayer || "0") +
+                        parseInt(birdBroiler || "0") >
                       0
-                        ? `Auto: ${(parseInt(birdBreeder || "0", 10) + parseInt(birdLayer || "0", 10) + parseInt(birdBroiler || "0", 10)).toLocaleString()} birds`
+                        ? `Auto: ${(parseInt(birdBreeder || "0") + parseInt(birdLayer || "0") + parseInt(birdBroiler || "0")).toLocaleString()} birds`
                         : "e.g. 50000"
                     }
-                    placeholderTextColor={Colors.textMuted}
+                    placeholderTextColor={Colors.textTertiary}
                     value={flockSize}
                     onChangeText={setFlockSize}
                     keyboardType="numeric"
@@ -1181,180 +2097,394 @@ export const ProgramControllerDashboard: React.FC<
                 </View>
               </View>
 
-              {/* SECTION 5: Vaccine Details */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+              {/* 5. Vaccine Details */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.h3,
+                    color: Colors.accent,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
                   5. Vaccine Details
                 </Text>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>
-                    Vaccine(s) Used * (comma-separated if multiple)
+                <View>
+                  <Text
+                    style={{
+                      ...Type.eyebrow,
+                      fontSize: 10,
+                      color: Colors.textSecondary,
+                      marginBottom: Spacing.xs,
+                    }}
+                  >
+                    Vaccine(s) Used * (comma-separated)
                   </Text>
                   <TextInput
-                    className={styles.input}
-                    placeholder="e.g. Vectormune ND, Cevac Transmune, Cevac IBird"
-                    placeholderTextColor={Colors.textMuted}
+                    style={{
+                      padding: Spacing.md,
+                      borderRadius: Radii.md,
+                      backgroundColor: Colors.surfaceInput,
+                      borderWidth: 1,
+                      borderColor: Colors.borderSubtle,
+                      color: Colors.textPrimary,
+                    }}
+                    placeholder="e.g. Vectormune ND, Cevac Transmune"
+                    placeholderTextColor={Colors.textTertiary}
                     value={vaccinesUsed}
                     onChangeText={setVaccinesUsed}
                   />
                 </View>
               </View>
 
-              {/* SECTION 6: Travel Schedule */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
-                  6. Travel Schedule
+              {/* 6-8. Schedules */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.h3,
+                    color: Colors.accent,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
+                  6. Travel & Vaccination Schedules
                 </Text>
 
-                <View className={styles.row}>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>
-                      Departure Time from Office
+                <Text
+                  style={{
+                    ...Type.bodyStrong,
+                    color: Colors.textPrimary,
+                    marginBottom: Spacing.sm,
+                  }}
+                >
+                  Travel Schedule
+                </Text>
+                <View style={{ flexDirection: "row", gap: Spacing.md }}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Departure from Office
                     </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={travelDepartureTime}
                       onChangeText={setTravelDepartureTime}
-                      placeholder="06:30 AM"
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>
-                      Arrival Time at Farm / Hatchery
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Arrival at Farm
                     </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={travelArrivalTime}
                       onChangeText={setTravelArrivalTime}
-                      placeholder="07:45 AM"
                     />
                   </View>
                 </View>
-              </View>
 
-              {/* SECTION 7: Vaccination Schedule */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
-                  7. Vaccination Schedule
+                <Text
+                  style={{
+                    ...Type.bodyStrong,
+                    color: Colors.textPrimary,
+                    marginTop: Spacing.lg,
+                    marginBottom: Spacing.sm,
+                  }}
+                >
+                  Vaccination Schedule
                 </Text>
-
-                <View className={styles.row}>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>Vaccination Started At</Text>
+                <View style={{ flexDirection: "row", gap: Spacing.md }}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Started At
+                    </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={vaccinationStartedAtTime}
                       onChangeText={setVaccinationStartedAtTime}
-                      placeholder="08:15 AM"
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>
-                      Vaccination Completed At
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Completed At
                     </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={vaccinationCompletedAtTime}
                       onChangeText={setVaccinationCompletedAtTime}
-                      placeholder="03:45 PM"
                     />
                   </View>
                 </View>
-              </View>
 
-              {/* SECTION 8: Return Schedule */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
-                  8. Return Schedule
+                <Text
+                  style={{
+                    ...Type.bodyStrong,
+                    color: Colors.textPrimary,
+                    marginTop: Spacing.lg,
+                    marginBottom: Spacing.sm,
+                  }}
+                >
+                  Return Schedule
                 </Text>
-
-                <View className={styles.row}>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>
-                      Departure Time from Farm / Hatchery
+                <View style={{ flexDirection: "row", gap: Spacing.md }}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Departure from Farm
                     </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={returnDepartureTime}
                       onChangeText={setReturnDepartureTime}
-                      placeholder="04:15 PM"
                     />
                   </View>
-                  <View className={`${styles.inputGroup} flex-1`}>
-                    <Text className={styles.label}>
-                      Returning Time at Office
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Arrival at Office
                     </Text>
                     <TextInput
-                      className={styles.input}
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
                       value={returnArrivalTime}
                       onChangeText={setReturnArrivalTime}
-                      placeholder="05:30 PM"
                     />
                   </View>
                 </View>
               </View>
 
-              {/* SECTION 9: Submission & Remarks */}
-              <View className="mb-2 rounded-xl border border-marush-border bg-white p-3.5">
-                <Text className="mb-2 text-xs font-black uppercase tracking-wider text-marush-primary">
+              {/* 9. Remarks */}
+              <View
+                style={{
+                  padding: Spacing.xl,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <Text
+                  style={{
+                    ...Type.h3,
+                    color: Colors.accent,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
                   9. Submission & Remarks
                 </Text>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Controller Remarks</Text>
+                <View>
+                  <Text
+                    style={{
+                      ...Type.eyebrow,
+                      fontSize: 10,
+                      color: Colors.textSecondary,
+                      marginBottom: Spacing.xs,
+                    }}
+                  >
+                    Controller Remarks
+                  </Text>
                   <TextInput
-                    className={`${styles.input} h-[70px]`}
+                    style={{
+                      padding: Spacing.md,
+                      borderRadius: Radii.md,
+                      backgroundColor: Colors.surfaceInput,
+                      borderWidth: 1,
+                      borderColor: Colors.borderSubtle,
+                      color: Colors.textPrimary,
+                      minHeight: 80,
+                    }}
                     multiline
                     placeholder="Record observations, site conditions, vehicle details or notes..."
-                    placeholderTextColor={Colors.textMuted}
+                    placeholderTextColor={Colors.textTertiary}
                     value={controllerRemarks}
                     onChangeText={setControllerRemarks}
                   />
                 </View>
-
-                <View className="mt-3 rounded-lg border border-dashed border-marush-border bg-white p-3">
-                  <Text className="text-[11px] font-bold text-marush-primary">
-                    System-Recorded Metadata
-                  </Text>
-                  <Text className="mt-1 text-[11px] text-marush-muted">
-                    • Creator: {currentUser.fullName} ({currentUser.email})
-                    {"\n"}• Status: pending_approval (sent to Admin){"\n"}•
-                    Submission Timestamp: Automatic server timestamp on save
-                  </Text>
-                </View>
               </View>
 
-              <View className="mt-1 flex-col gap-3 p-3">
+              {/* Action Buttons */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: Spacing.md,
+                  marginTop: Spacing.md,
+                }}
+              >
                 <TouchableOpacity
-                  className="min-w-[150px] flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-marush-primary/20 bg-marush-primary-subtle px-4 py-3.5 active:scale-[0.98]"
                   onPress={() => handleSaveDraft()}
                   disabled={submitting || savingDraft}
+                  style={{
+                    flex: 1,
+                    minWidth: 150,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: Spacing.sm,
+                    paddingVertical: Spacing.md,
+                    borderRadius: Radii.md,
+                    backgroundColor: Colors.surfaceCard,
+                    borderWidth: 1,
+                    borderColor: Colors.accentBorder,
+                  }}
                 >
                   {savingDraft ? (
-                    <ActivityIndicator color={Colors.primary} size="small" />
+                    <ActivityIndicator color={Colors.accent} size="small" />
                   ) : (
-                    <Save size={16} color={Colors.primary} />
+                    <Save size={16} color={Colors.accent} />
                   )}
-                  <Text className="text-sm font-bold text-marush-primary">
+                  <Text
+                    style={{
+                      ...Type.bodyStrong,
+                      fontWeight: "700",
+                      color: Colors.accent,
+                    }}
+                  >
                     Save as draft
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className={`min-w-[190px] flex-[1.4] flex-row items-center justify-center gap-2 rounded-2xl bg-marush-primary py-3.5 shadow-[0_2px_10px_rgba(0,79,66,0.2)] active:scale-[0.98] ${submitting ? styles.btnDisabled : ""}`}
                   onPress={handleInitiateProgram}
-                  disabled={submitting}
+                  disabled={submitting || !!activeIncompleteProgram}
+                  style={{
+                    flex: 1.5,
+                    minWidth: 190,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: Spacing.sm,
+                    paddingVertical: Spacing.md,
+                    borderRadius: Radii.md,
+                    backgroundColor: activeIncompleteProgram
+                      ? Colors.surfaceElevated
+                      : Colors.accent,
+                    borderWidth: activeIncompleteProgram ? 1 : 0,
+                    borderColor: activeIncompleteProgram
+                      ? Colors.border
+                      : "transparent",
+                    opacity: activeIncompleteProgram ? 0.6 : 1,
+                    ...(activeIncompleteProgram ? {} : Shadows.accentGlow),
+                  }}
                 >
                   {submitting ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={Colors.white} size="small" />
                   ) : (
-                    <View className="flex-row items-center justify-center gap-2">
-                      <ClipboardCheck size={16} color={Colors.white} />
-                      <Text className={styles.submitProgBtnText}>
-                        Submit Program & Team to Admin
-                      </Text>
-                    </View>
+                    <ClipboardCheck
+                      size={16}
+                      color={
+                        activeIncompleteProgram
+                          ? Colors.textTertiary
+                          : Colors.white
+                      }
+                    />
                   )}
+                  <Text
+                    style={{
+                      ...Type.bodyStrong,
+                      fontWeight: "700",
+                      color: activeIncompleteProgram
+                        ? Colors.textTertiary
+                        : Colors.white,
+                    }}
+                  >
+                    {activeIncompleteProgram
+                      ? "Current program must be completed"
+                      : "Submit Program"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1362,133 +2492,278 @@ export const ProgramControllerDashboard: React.FC<
         )}
       </ScrollView>
 
-      {/* End Program / Submit to Admin Modal */}
+      {/* End Program Modal */}
       {endingProgram && (
         <Modal visible transparent animationType="fade">
-          <View className={styles.modalOverlay}>
-            <View className={styles.modalCard}>
-              <Text className={styles.modalTitle}>
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: Spacing.lg,
+              backgroundColor: Colors.surfaceOverlay,
+            }}
+          >
+            <View
+              style={{
+                width: "100%",
+                maxWidth: 520,
+                maxHeight: "90%",
+                padding: Spacing["2xl"],
+                borderRadius: Radii["2xl"],
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surfaceElevated,
+                ...Shadows.popover,
+              }}
+            >
+              <Text style={{ ...Type.h2, color: Colors.textPrimary }}>
                 End Program & Record Metrics
               </Text>
-              <Text className={styles.modalSub}>
+              <Text
+                style={{
+                  ...Type.caption,
+                  color: Colors.textSecondary,
+                  marginTop: Spacing.xs,
+                  marginBottom: Spacing.lg,
+                }}
+              >
                 {endingProgram.programName}
               </Text>
 
-              <ScrollView className={styles.modalScroll}>
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Total Birds Vaccinated</Text>
-                  <TextInput
-                    className={styles.input}
-                    value={birdsVaccinated}
-                    onChangeText={setBirdsVaccinated}
-                    keyboardType="numeric"
-                  />
-                </View>
+              <ScrollView style={{ marginBottom: Spacing.lg }}>
+                <View style={{ gap: Spacing.md }}>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Total Birds Vaccinated
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      value={birdsVaccinated}
+                      onChangeText={setBirdsVaccinated}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Dosage Per Bird
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      value={dosagePerBird}
+                      onChangeText={setDosagePerBird}
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Vaccine Batch Number
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      value={batchNumber}
+                      onChangeText={setBatchNumber}
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Cold-Chain Log Temperature (°C)
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                      }}
+                      value={coldChainTemp}
+                      onChangeText={setColdChainTemp}
+                      keyboardType="numeric"
+                    />
+                  </View>
 
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Dosage Per Bird</Text>
-                  <TextInput
-                    className={styles.input}
-                    value={dosagePerBird}
-                    onChangeText={setDosagePerBird}
-                  />
-                </View>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Vaccine Batch Number</Text>
-                  <TextInput
-                    className={styles.input}
-                    value={batchNumber}
-                    onChangeText={setBatchNumber}
-                  />
-                </View>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Vaccine Type</Text>
-                  <TextInput
-                    className={styles.input}
-                    value={vaccineType}
-                    onChangeText={setVaccineType}
-                  />
-                </View>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>
-                    Cold-Chain Log Temperature (Ã‚Â°C)
-                  </Text>
-                  <TextInput
-                    className={styles.input}
-                    value={coldChainTemp}
-                    onChangeText={setColdChainTemp}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>Equipment Check Status</Text>
                   <TouchableOpacity
-                    className={`${styles.toggleBtn} ${equipmentCheckPassed ? styles.toggleBtnPassed : styles.toggleBtnFailed}`}
                     onPress={() =>
                       setEquipmentCheckPassed(!equipmentCheckPassed)
                     }
+                    style={{
+                      padding: Spacing.md,
+                      borderRadius: Radii.md,
+                      alignItems: "center",
+                      backgroundColor: equipmentCheckPassed
+                        ? Colors.successSubtle
+                        : Colors.dangerSubtle,
+                      borderWidth: 1,
+                      borderColor: equipmentCheckPassed
+                        ? Colors.successBorder
+                        : Colors.dangerBorder,
+                    }}
                   >
-                    <View className="flex-row items-center gap-2">
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: Spacing.sm,
+                      }}
+                    >
                       {equipmentCheckPassed ? (
-                        <Check
-                          size={15}
-                          color={Colors.white}
-                          strokeWidth={2.5}
-                        />
+                        <Check size={15} color={Colors.success} />
                       ) : (
-                        <CircleX
-                          size={15}
-                          color={Colors.white}
-                          strokeWidth={2.5}
-                        />
+                        <CircleX size={15} color={Colors.danger} />
                       )}
-                      <Text className={styles.toggleBtnText}>
+                      <Text
+                        style={{
+                          ...Type.bodyStrong,
+                          fontWeight: "700",
+                          color: equipmentCheckPassed
+                            ? Colors.success
+                            : Colors.danger,
+                        }}
+                      >
                         Equipment Check{" "}
                         {equipmentCheckPassed ? "PASSED" : "FAILED"}
                       </Text>
                     </View>
                   </TouchableOpacity>
-                </View>
 
-                <View className={styles.inputGroup}>
-                  <Text className={styles.label}>
-                    Flock Monitoring Observations
-                  </Text>
-                  <TextInput
-                    className={`${styles.input} h-[60px]`}
-                    multiline
-                    value={farmFlockNotes}
-                    onChangeText={setFarmFlockNotes}
-                  />
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 10,
+                        color: Colors.textSecondary,
+                        marginBottom: Spacing.xs,
+                      }}
+                    >
+                      Flock Monitoring Observations
+                    </Text>
+                    <TextInput
+                      style={{
+                        padding: Spacing.md,
+                        borderRadius: Radii.md,
+                        backgroundColor: Colors.surfaceInput,
+                        borderWidth: 1,
+                        borderColor: Colors.borderSubtle,
+                        color: Colors.textPrimary,
+                        minHeight: 60,
+                      }}
+                      multiline
+                      value={farmFlockNotes}
+                      onChangeText={setFarmFlockNotes}
+                    />
+                  </View>
                 </View>
               </ScrollView>
 
-              <View className={styles.modalBtnRow}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: Spacing.md,
+                  marginTop: Spacing.md,
+                }}
+              >
                 <TouchableOpacity
-                  className={styles.cancelModalBtn}
                   onPress={() => setEndingProgram(null)}
                   disabled={submitting}
+                  style={{
+                    paddingHorizontal: Spacing.xl,
+                    paddingVertical: Spacing.md,
+                    borderRadius: Radii.md,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    backgroundColor: Colors.surfaceInput,
+                  }}
                 >
-                  <Text className={styles.cancelModalBtnText}>Cancel</Text>
+                  <Text
+                    style={{
+                      ...Type.caption,
+                      fontWeight: "700",
+                      color: Colors.textSecondary,
+                    }}
+                  >
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className={`${styles.confirmModalBtn} ${submitting ? styles.btnDisabled : ""}`}
                   onPress={handleConfirmEndProgram}
                   disabled={submitting}
+                  style={{
+                    paddingHorizontal: Spacing.xl,
+                    paddingVertical: Spacing.md,
+                    borderRadius: Radii.md,
+                    backgroundColor: Colors.accent,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: Spacing.sm,
+                    ...Shadows.accentGlow,
+                  }}
                 >
                   {submitting ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={Colors.white} size="small" />
                   ) : (
-                    <View className="flex-row items-center justify-center gap-2">
+                    <>
                       <Send size={15} color={Colors.white} />
-                      <Text className={styles.confirmModalBtnText}>
+                      <Text
+                        style={{
+                          ...Type.caption,
+                          fontWeight: "700",
+                          color: Colors.white,
+                        }}
+                      >
                         Submit to Admin
                       </Text>
-                    </View>
+                    </>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1500,94 +2775,4 @@ export const ProgramControllerDashboard: React.FC<
       {ConfirmDialogElement}
     </View>
   );
-};
-
-const styles = {
-  container: "flex-1 bg-slate-50",
-  tabBar:
-    "flex-row flex-wrap items-center justify-between border-b border-black/[0.06] bg-white px-5 md:px-8 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-  filterRow: "gap-2 px-5 py-3",
-  filterChip:
-    "min-h-[34px] justify-center rounded-full border border-black/[0.08] bg-white px-3.5 shadow-sm transition-all",
-  filterChipActive: "border-marush-primary bg-marush-primary-subtle",
-  filterChipText: "text-xs font-semibold text-slate-500",
-  filterChipTextActive: "font-bold text-marush-primary",
-  tabGroup: "flex-row flex-wrap gap-5",
-  tabBtn: "border-b-2 border-transparent px-1 py-4",
-  tabBtnActive: "border-marush-primary",
-  tabBtnText: "text-[13px] font-semibold text-slate-500",
-  tabBtnTextActive: "font-bold text-marush-primary",
-  refreshBtn:
-    "rounded-2xl border border-black/[0.08] bg-white px-3.5 py-2 shadow-sm active:scale-[0.97]",
-  refreshBtnText: "text-xs font-bold text-marush-primary",
-  content: "mx-auto w-full max-w-[1180px] p-4 md:p-8",
-  section: "gap-3",
-  sectionTitle: "mb-1 text-xl font-black tracking-tight text-slate-900",
-  emptyBox:
-    "items-center gap-3 rounded-3xl border border-dashed border-black/[0.1] bg-white p-10",
-  emptyText: "text-sm text-slate-500",
-  initiatePromptBtn:
-    "rounded-2xl bg-marush-primary px-4 py-2.5 shadow-sm active:scale-[0.97]",
-  initiatePromptBtnText: "text-xs font-bold text-white",
-  progCard:
-    "mb-3 gap-2 rounded-3xl border border-black/[0.07] bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]",
-  cardHeader: "flex-row flex-wrap items-start justify-between gap-2",
-  cardTitle: "min-w-0 flex-1 text-base font-bold tracking-tight text-slate-900",
-  statusBadge: "rounded-full px-3 py-1",
-  statusBadgeText: "text-[10px] font-black uppercase tracking-wider",
-  cardSub: "text-sm font-semibold text-slate-600",
-  cardMeta: "text-xs text-slate-400",
-  endProgBtn:
-    "mt-3 items-center rounded-2xl bg-marush-primary py-2.5 shadow-sm active:scale-[0.97]",
-  endProgBtnText: "text-xs font-bold text-white",
-  waitingBanner:
-    "mt-2 rounded-2xl bg-slate-50 border border-black/[0.05] p-2.5",
-  waitingBannerText: "text-xs italic text-slate-500",
-  auditFeedback:
-    "mt-2.5 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-3.5",
-  auditFeedbackTitle:
-    "text-xs font-bold text-emerald-800 uppercase tracking-wide",
-  auditFeedbackText: "mt-0.5 text-xs italic text-emerald-900",
-  auditScorePill: "mt-1 text-xs font-black text-emerald-800",
-  formCard:
-    "gap-4 rounded-3xl border border-black/[0.07] bg-white p-6 md:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)]",
-  formTitle: "text-xl font-black tracking-tight text-slate-900",
-  formSub: "mb-2 text-xs text-slate-500",
-  inputGroup: "gap-1.5",
-  label: "text-xs font-bold uppercase tracking-wider text-slate-500",
-  input:
-    "rounded-xl border border-black/[0.08] px-3.5 py-2.5 text-sm text-slate-800",
-  row: "flex-row flex-wrap gap-3",
-  empSelectHeader: "flex-row flex-wrap items-center justify-between gap-2",
-  availCount: "text-xs font-bold text-marush-secondary-dark",
-  noEmpBox: "my-1 rounded-2xl border border-amber-200 bg-amber-50/80 p-3",
-  noEmpWarning: "text-xs italic text-amber-800",
-  empListGrid: "mt-2 flex-row flex-wrap gap-2",
-  empPill:
-    "rounded-2xl border border-black/[0.08] bg-slate-50 px-3.5 py-2.5 shadow-sm active:scale-[0.97]",
-  empPillSelected: "border-marush-primary bg-marush-primary shadow-sm",
-  empPillText: "text-xs font-semibold text-slate-700",
-  empPillTextSelected: "font-bold text-white",
-  submitProgBtn:
-    "mt-3 items-center rounded-2xl bg-marush-primary py-3.5 shadow-[0_2px_10px_rgba(0,79,66,0.2)] active:scale-[0.98]",
-  btnDisabled: "opacity-70",
-  submitProgBtnText: "text-sm font-bold text-white tracking-tight",
-  modalOverlay:
-    "flex-1 items-center justify-center bg-black/40 backdrop-blur-sm p-4",
-  modalCard:
-    "max-h-[90%] w-full max-w-[520px] rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-black/[0.08]",
-  modalTitle: "text-xl font-black tracking-tight text-slate-900",
-  modalSub: "mb-4 text-xs text-slate-500",
-  modalScroll: "mb-4",
-  toggleBtn: "mt-1 items-center rounded-2xl py-2.5 active:scale-[0.97]",
-  toggleBtnPassed: "bg-emerald-50 border border-emerald-200 text-emerald-800",
-  toggleBtnFailed: "bg-red-50 border border-red-200 text-red-800",
-  toggleBtnText: "text-xs font-black tracking-wide",
-  modalBtnRow: "flex-row flex-wrap justify-end gap-3",
-  cancelModalBtn:
-    "min-w-[100px] flex-1 items-center rounded-2xl border border-black/[0.08] px-4 py-2.5 active:scale-[0.97]",
-  cancelModalBtnText: "text-xs font-bold text-slate-600",
-  confirmModalBtn:
-    "min-w-[160px] flex-1 items-center rounded-2xl bg-marush-primary px-4 py-2.5 shadow-sm active:scale-[0.97]",
-  confirmModalBtnText: "text-xs font-bold text-white tracking-tight",
 };

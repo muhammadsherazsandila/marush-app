@@ -1,5 +1,3 @@
-import React from 'react';
-import { Platform, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import {
   Building2,
   CheckCircle2,
@@ -8,27 +6,144 @@ import {
   LogOut,
   Mail,
   Phone,
+  ShieldAlert,
   ShieldCheck,
-} from 'lucide-react-native';
-import { Colors } from '../constants/colors';
-import { UserProfile } from '../types';
-import { useConfirmDialog } from '../components/ConfirmDialog';
+  User,
+} from "lucide-react-native";
+import React, { useCallback } from "react";
+import {
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useConfirmDialog } from "../components/ConfirmDialog";
+import { Colors, Radii, Shadows, Spacing, Type } from "../constants/design";
+import { UserProfile } from "../types";
 
 interface ProfileScreenProps {
   user: UserProfile;
   onLogout: () => void;
 }
 
-const roleLabels: Record<string, string> = {
-  admin: 'Executive Administrator',
-  program_controller: 'Program Controller',
-  program_auditor: 'Senior Quality Auditor',
-  employee: 'Field Vaccination Specialist',
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Executive Administrator",
+  program_controller: "Program Controller",
+  program_auditor: "Senior Quality Auditor",
+  employee: "Field Vaccination Specialist",
 };
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) => {
-  const { width } = useWindowDimensions();
-  const isCompact = width < 640;
+const getAssignedRoleLabel = (u: UserProfile) => {
+  if (u.isDeveloper) return "Super User (Developer)";
+  if (u.isSuperAdmin) return "Super Administrator";
+  return ROLE_LABELS[u.role] || "Field Specialist";
+};
+
+/* ── Sub-components ──────────────────────────────────────────── */
+
+const StatusPill: React.FC<{ status: UserProfile["status"] }> = ({
+  status,
+}) => {
+  const color =
+    status === "approved"
+      ? Colors.success
+      : status === "rejected"
+        ? Colors.danger
+        : Colors.warning;
+
+  const Icon = status === "rejected" ? ShieldAlert : CheckCircle2;
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: Spacing.xs + 2,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs,
+        borderRadius: Radii.pill,
+        borderWidth: 1,
+        borderColor: `${color}40`,
+        backgroundColor: `${color}15`,
+      }}
+    >
+      <Icon size={12} color={color} strokeWidth={2.5} />
+      <Text
+        style={{
+          ...Type.eyebrow,
+          fontSize: 10,
+          color,
+        }}
+      >
+        {status}
+      </Text>
+    </View>
+  );
+};
+
+const DetailItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}> = ({ icon, label, value, mono }) => (
+  <View
+    style={{
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: Spacing.md,
+      paddingVertical: Spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.borderSubtle,
+    }}
+  >
+    <View
+      style={{
+        width: 32,
+        height: 32,
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: Radii.sm,
+        backgroundColor: Colors.surfaceInput,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        marginTop: 2,
+      }}
+    >
+      {icon}
+    </View>
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <Text
+        style={{
+          ...Type.eyebrow,
+          fontSize: 9,
+          color: Colors.textTertiary,
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          ...Type.bodyStrong,
+          color: Colors.textPrimary,
+          ...(mono ? { fontFamily: "monospace", fontSize: 13 } : {}),
+        }}
+        selectable
+      >
+        {value}
+      </Text>
+    </View>
+  </View>
+);
+
+/* ── Screen ──────────────────────────────────────────────────── */
+
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+  user,
+  onLogout,
+}) => {
   const { confirm, ConfirmDialogElement } = useConfirmDialog();
 
   const initials = user.fullName
@@ -36,143 +151,332 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onLogout }) 
     .split(/\s+/)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
-    .join('');
+    .join("");
 
-  const handleLogoutPress = () => {
+  const handleLogoutPress = useCallback(() => {
     confirm({
-      title: 'Sign Out',
+      title: "Sign Out",
       message: `Are you sure you want to log out of your session as ${user.fullName}? You will need to sign in again to access the operations workspace.`,
-      confirmText: 'Sign Out',
-      cancelText: 'Stay Signed In',
-      variant: 'danger',
-      icon: 'logout',
+      confirmText: "Sign Out",
+      cancelText: "Stay Signed In",
+      variant: "danger",
+      icon: "logout",
       onConfirm: onLogout,
     });
-  };
+  }, [confirm, onLogout, user.fullName]);
 
   return (
-    <ScrollView className="flex-1 bg-slate-50">
-      <View className="flex-grow px-5 py-7 md:py-10">
-        <View className="mx-auto w-full max-w-[720px]">
-          {/* Header */}
-          <View className="mb-6">
-            <Text className="text-[10px] font-black tracking-[1.8px] uppercase text-marush-secondary-dark">
-              Account Security & Identity
-            </Text>
-            <Text className="mt-1 text-2xl md:text-3xl font-black tracking-tight text-slate-900">
-              Verified Profile
-            </Text>
-            <Text className="mt-1 max-w-[580px] text-xs md:text-sm leading-relaxed text-slate-500">
-              Your identity credentials and field clearance assigned by Marush Operations.
-            </Text>
-          </View>
-
-          {/* Profile Identity Card */}
-          <View className="overflow-hidden rounded-3xl border border-black/[0.07] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
-            <View className={`bg-marush-primary ${isCompact ? 'p-5' : 'p-6'}`}>
-              <View className="flex-row items-center gap-4">
-                <View className="h-16 w-16 items-center justify-center rounded-2xl bg-white/15 border border-white/20 shadow-inner">
-                  <Text className="text-xl font-black text-white tracking-wider">{initials || 'U'}</Text>
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Text className="text-lg md:text-xl font-bold text-white tracking-tight" numberOfLines={1}>
-                    {user.fullName}
-                  </Text>
-                  <Text className="mt-0.5 text-xs font-semibold text-emerald-200">
-                    {roleLabels[user.role] || 'Field Specialist'}
-                  </Text>
-                </View>
-                {!isCompact && <ProfileStatus status={user.status} />}
-              </View>
-              {isCompact && (
-                <View className="mt-4 self-start">
-                  <ProfileStatus status={user.status} />
-                </View>
-              )}
-            </View>
-
-            <View className="flex-row flex-wrap gap-x-6 gap-y-2 border-t border-black/[0.06] bg-slate-50/60 px-6 py-3.5">
-              <View className="flex-row items-center gap-2">
-                <ShieldCheck size={14} color={Colors.primary} strokeWidth={2.4} />
-                <Text className="text-xs font-semibold text-slate-600">SSO Verified Account</Text>
-              </View>
-              <View className="flex-row items-center gap-2">
-                <Building2 size={14} color={Colors.primary} strokeWidth={2.4} />
-                <Text className="text-xs font-semibold text-slate-600">Ceva Animal Health Operations</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Account Details Group */}
-          <View className="mt-6">
-            <Text className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-400">
-              Operational Details
-            </Text>
-            <View className="overflow-hidden rounded-3xl border border-black/[0.07] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.02)] divide-y divide-black/[0.05]">
-              <ProfileDetail icon={<Mail size={17} color={Colors.primary} strokeWidth={2.2} />} label="Corporate Email" value={user.email} />
-              <ProfileDetail icon={<ShieldCheck size={17} color={Colors.primary} strokeWidth={2.2} />} label="Assigned Role" value={roleLabels[user.role] || 'Field Specialist'} />
-              {user.employeeCode && (
-                <ProfileDetail icon={<IdCard size={17} color={Colors.primary} strokeWidth={2.2} />} label="Staff Code" value={user.employeeCode} mono />
-              )}
-              {user.phone && (
-                <ProfileDetail icon={<Phone size={17} color={Colors.primary} strokeWidth={2.2} />} label="Direct Contact" value={user.phone} />
-              )}
-              <ProfileDetail icon={<Building2 size={17} color={Colors.primary} strokeWidth={2.2} />} label="Organization Entity" value="Marush (Pvt.) Ltd. • Ceva Veterinary Health" />
-            </View>
-          </View>
-
-          {/* Tactile Logout Button */}
-          <TouchableOpacity
-            className="mt-8 flex-row items-center justify-between rounded-2xl border border-red-200/80 bg-red-50/60 px-5 py-4 shadow-sm transition-all"
-            onPress={handleLogoutPress}
-            accessibilityRole="button"
-            activeOpacity={0.8}
-            {...(Platform.OS === 'web'
-              ? ({
-                  style: {
-                    transition: 'transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease-out',
-                  },
-                } as any)
-              : {})}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: Colors.surface }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: Spacing["5xl"] }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 1000,
+          alignSelf: "center",
+          paddingHorizontal: Spacing.xl,
+          paddingTop: Spacing["3xl"],
+        }}
+      >
+        {/* Page Header */}
+        <View style={{ marginBottom: Spacing["3xl"] }}>
+          <Text style={{ ...Type.eyebrow, color: Colors.accent }}>
+            Account Security & Identity
+          </Text>
+          <Text
+            style={{
+              ...Type.h1,
+              color: Colors.textPrimary,
+              marginTop: Spacing.xs,
+            }}
           >
-            <View className="flex-row items-center gap-3.5">
-              <View className="rounded-xl bg-white p-2 border border-red-100 shadow-sm">
-                <LogOut size={16} color="#DC2626" strokeWidth={2.4} />
+            My Profile
+          </Text>
+        </View>
+
+        {/* 2-Column Layout (stacks on mobile) */}
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            gap: Spacing["2xl"],
+          }}
+        >
+          {/* ── LEFT COLUMN: Identity Card ────────────────────────────── */}
+          <View style={{ flex: 1, minWidth: 300, gap: Spacing.lg }}>
+            <View
+              style={{
+                padding: Spacing["2xl"],
+                borderRadius: Radii["2xl"],
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surfaceElevated,
+                ...Shadows.cardElevated,
+                overflow: "hidden",
+              }}
+            >
+              {/* Subtle top accent line */}
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 4,
+                  backgroundColor: Colors.accent,
+                }}
+              />
+
+              <View style={{ alignItems: "center", marginTop: Spacing.sm }}>
+                {/* Avatar */}
+                <View
+                  style={{
+                    width: 88,
+                    height: 88,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: Radii.pill,
+                    backgroundColor: Colors.accentSubtle,
+                    borderWidth: 2,
+                    borderColor: Colors.accentBorder,
+                    marginBottom: Spacing.lg,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 28,
+                      fontWeight: "700",
+                      color: Colors.accent,
+                      letterSpacing: 1,
+                    }}
+                  >
+                    {initials || "U"}
+                  </Text>
+                </View>
+
+                <Text
+                  style={{
+                    ...Type.h2,
+                    color: Colors.textPrimary,
+                    textAlign: "center",
+                  }}
+                >
+                  {user.fullName}
+                </Text>
+                <Text
+                  style={{
+                    ...Type.bodyStrong,
+                    color: Colors.textSecondary,
+                    marginTop: Spacing.xs,
+                    textAlign: "center",
+                  }}
+                >
+                  {getAssignedRoleLabel(user)}
+                </Text>
+
+                <View style={{ marginTop: Spacing.lg }}>
+                  <StatusPill status={user.status} />
+                </View>
               </View>
-              <View>
-                <Text className="text-sm font-bold text-red-700">Sign Out of Session</Text>
-                <Text className="text-[11px] text-red-600/80">End active session securely on this device</Text>
+
+              {/* Divider */}
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: Colors.border,
+                  marginVertical: Spacing["2xl"],
+                }}
+              />
+
+              {/* Corporate Affiliation */}
+              <View style={{ gap: Spacing.md }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: Spacing.sm,
+                  }}
+                >
+                  <ShieldCheck
+                    size={16}
+                    color={Colors.accent}
+                    strokeWidth={2.2}
+                  />
+                  <Text
+                    style={{
+                      ...Type.caption,
+                      fontWeight: "600",
+                      color: Colors.textSecondary,
+                    }}
+                  >
+                    SSO Verified Account
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: Spacing.sm,
+                  }}
+                >
+                  <Building2
+                    size={16}
+                    color={Colors.accent}
+                    strokeWidth={2.2}
+                  />
+                  <Text
+                    style={{
+                      ...Type.caption,
+                      fontWeight: "600",
+                      color: Colors.textSecondary,
+                    }}
+                  >
+                    Marush Pvt. Ltd. (Ceva Pakistan)
+                  </Text>
+                </View>
               </View>
             </View>
-            <ChevronRight size={17} color="#DC2626" />
-          </TouchableOpacity>
+          </View>
+
+          {/* ── RIGHT COLUMN: Details & Actions ───────────────────────── */}
+          <View style={{ flex: 1.5, minWidth: 320, gap: Spacing["2xl"] }}>
+            {/* Operational Details */}
+            <View>
+              <Text
+                style={{
+                  ...Type.eyebrow,
+                  color: Colors.textTertiary,
+                  marginBottom: Spacing.md,
+                }}
+              >
+                Operational Details
+              </Text>
+              <View
+                style={{
+                  paddingHorizontal: Spacing.xl,
+                  paddingVertical: Spacing.sm,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                }}
+              >
+                <DetailItem
+                  icon={<Mail size={16} color={Colors.textSecondary} />}
+                  label="Corporate Email"
+                  value={user.email || "Not provided"}
+                />
+                <DetailItem
+                  icon={<User size={16} color={Colors.textSecondary} />}
+                  label="Assigned System Role"
+                  value={getAssignedRoleLabel(user)}
+                />
+                {user.employeeCode && (
+                  <DetailItem
+                    icon={<IdCard size={16} color={Colors.textSecondary} />}
+                    label="Staff Identification Code"
+                    value={user.employeeCode}
+                    mono
+                  />
+                )}
+                {user.phone && (
+                  <DetailItem
+                    icon={<Phone size={16} color={Colors.textSecondary} />}
+                    label="Direct Contact"
+                    value={user.phone}
+                  />
+                )}
+                <View style={{ borderBottomWidth: 0 }}>
+                  <DetailItem
+                    icon={<Building2 size={16} color={Colors.textSecondary} />}
+                    label="Organization Entity"
+                    value="Marush (Pvt.) Ltd. • Ceva Veterinary Health"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Session / Danger Zone */}
+            <View>
+              <Text
+                style={{
+                  ...Type.eyebrow,
+                  color: Colors.textTertiary,
+                  marginBottom: Spacing.md,
+                }}
+              >
+                Session Management
+              </Text>
+              <TouchableOpacity
+                onPress={handleLogoutPress}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: Spacing.xl,
+                  paddingVertical: Spacing.lg,
+                  borderRadius: Radii.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surfaceCard,
+                  ...(Platform.OS === "web"
+                    ? ({
+                        transition:
+                          "background-color 140ms ease-out, border-color 140ms ease-out",
+                      } as any)
+                    : {}),
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: Spacing.md,
+                  }}
+                >
+                  <View
+                    style={{
+                      padding: Spacing.sm,
+                      borderRadius: Radii.md,
+                      backgroundColor: Colors.dangerSubtle,
+                      borderWidth: 1,
+                      borderColor: Colors.dangerBorder,
+                    }}
+                  >
+                    <LogOut size={18} color={Colors.danger} strokeWidth={2.2} />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        ...Type.bodyStrong,
+                        color: Colors.danger,
+                      }}
+                    >
+                      Sign Out of Session
+                    </Text>
+                    <Text
+                      style={{
+                        ...Type.caption,
+                        color: Colors.textSecondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      End active session securely on this device
+                    </Text>
+                  </View>
+                </View>
+                <ChevronRight size={18} color={Colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </View>
       {ConfirmDialogElement}
     </ScrollView>
   );
 };
-
-interface ProfileDetailProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  mono?: boolean;
-}
-
-const ProfileStatus: React.FC<{ status: UserProfile['status'] }> = ({ status }) => (
-  <View className="flex-row items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 border border-white/25 shadow-sm">
-    <CheckCircle2 size={13} color="#A7F3D0" strokeWidth={2.6} />
-    <Text className="text-[10px] font-black uppercase tracking-wider text-emerald-100">{status}</Text>
-  </View>
-);
-
-const ProfileDetail: React.FC<ProfileDetailProps> = ({ icon, label, value, mono = false }) => (
-  <View className="flex-row items-center gap-3.5 px-5 py-3.5">
-    <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100 border border-black/[0.04]">{icon}</View>
-    <View className="min-w-0 flex-1">
-      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
-      <Text className={`mt-0.5 text-sm font-semibold text-slate-800 ${mono ? 'font-mono' : ''}`}>{value}</Text>
-    </View>
-  </View>
-);

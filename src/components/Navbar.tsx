@@ -1,7 +1,12 @@
-import React from 'react';
-import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { ArrowLeft, Bell, ShieldCheck } from 'lucide-react-native';
-import { Colors } from '../constants/colors';
+import { ArrowLeft, Bell, ShieldCheck } from "lucide-react-native";
+import React from "react";
+import {
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { Colors, Radii, Spacing, Type } from "../constants/design";
 
 interface NavbarProps {
   title?: string;
@@ -9,28 +14,138 @@ interface NavbarProps {
   onNotifications?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ title = 'Overview', onBack, onNotifications }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  title = "Overview",
+  onBack,
+  onNotifications,
+}) => {
   const { width } = useWindowDimensions();
   const isCompact = width < 520;
 
   return (
-    <View className="border-b border-[#E4E8EA] bg-white">
-      <View className={`mx-auto w-full max-w-[1480px] flex-row items-center justify-between ${isCompact ? 'px-5 py-3' : 'px-10 py-3.5'}`}>
-        <View className="flex-row items-center gap-3">
-          {onBack && <TouchableOpacity onPress={onBack} className="rounded-lg border border-[#D7E1E4] p-2"><ArrowLeft size={17} color={Colors.primary} /></TouchableOpacity>}
-          <View><Text className="text-[10px] font-bold uppercase tracking-[1.8px] text-[#8A989C]">MARUSH WORKSPACE</Text><Text className="mt-0.5 text-sm font-black text-[#152A35]">{title}</Text></View>
+    <View
+      style={{
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+        backgroundColor: Colors.surface,
+      }}
+    >
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 1480,
+          alignSelf: "center",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: isCompact ? Spacing.xl : Spacing["4xl"],
+          paddingVertical: isCompact ? Spacing.md : Spacing.md + 2,
+        }}
+      >
+        {/* Left side: Back button + Title */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: Spacing.md,
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          {onBack && (
+            <TouchableOpacity
+              onPress={onBack}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              style={{
+                padding: Spacing.sm,
+                borderRadius: Radii.md,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surfaceInput,
+              }}
+            >
+              <ArrowLeft size={17} color={Colors.accent} />
+            </TouchableOpacity>
+          )}
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={{
+                ...Type.eyebrow,
+                fontSize: 9,
+                letterSpacing: 1.8,
+                color: Colors.textTertiary,
+              }}
+            >
+              MARUSH WORKSPACE
+            </Text>
+            <Text
+              style={{
+                ...Type.bodyStrong,
+                fontWeight: "700",
+                color: Colors.textPrimary,
+                marginTop: 2,
+              }}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+          </View>
         </View>
-        <View className="flex-row items-center gap-3">
-          {!isCompact && <View className="flex-row items-center gap-2"><View className="h-2 w-2 rounded-full bg-emerald-500" /><Text className="text-[11px] font-bold text-[#527278]">All systems operational</Text></View>}
+
+        {/* Right side: Status, Notifications, Shield */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: Spacing.md,
+          }}
+        >
+          {!isCompact && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: Spacing.sm,
+              }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: Radii.pill,
+                  backgroundColor: Colors.success,
+                }}
+              />
+              <Text
+                style={{
+                  ...Type.caption,
+                  fontWeight: "700",
+                  color: Colors.textSecondary,
+                }}
+              >
+                All systems operational
+              </Text>
+            </View>
+          )}
+
           <TouchableOpacity
             onPress={onNotifications}
-            className="rounded-lg border border-[#D7E1E4] p-2"
             accessibilityRole="button"
             accessibilityLabel="Open notifications"
+            style={{
+              padding: Spacing.sm,
+              borderRadius: Radii.md,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              backgroundColor: Colors.surfaceInput,
+            }}
           >
-            <Bell size={16} color="#527278" />
+            <Bell size={16} color={Colors.textSecondary} />
           </TouchableOpacity>
-          {!isCompact && <ShieldCheck size={16} color={Colors.primary} />}
+
+          {!isCompact && <ShieldCheck size={16} color={Colors.accent} />}
         </View>
       </View>
     </View>

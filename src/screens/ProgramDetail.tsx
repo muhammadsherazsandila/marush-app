@@ -1,92 +1,534 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, MapPin, ShieldCheck, Users } from 'lucide-react-native';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
-import { Colors } from '../constants/colors';
-import { dataProvider } from '../services';
-import { Program } from '../types';
+import {
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  MapPin,
+  ShieldCheck,
+  Users,
+} from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Toast from "react-native-toast-message";
+import { Colors, Radii, Spacing, Type } from "../constants/design";
+import { dataProvider } from "../services";
+import { Program } from "../types";
 
 interface ProgramDetailProps {
   program: Program;
   onBack: () => void;
 }
 
-const statusColors: Record<Program['status'], string> = {
-  draft: '#73848A',
-  pending_approval: '#AF741A',
-  active: '#2D766D',
-  pending_audit: '#4B71A4',
-  pending_admin_review: '#4B71A4',
-  completed: '#397A61',
-  cancelled: '#B84C4C',
+const getStatusColor = (status: Program["status"]) => {
+  switch (status) {
+    case "active":
+      return Colors.accent;
+    case "completed":
+      return Colors.success;
+    case "cancelled":
+      return Colors.danger;
+    case "pending_approval":
+    case "pending_audit":
+    case "pending_admin_review":
+      return Colors.warning;
+    default:
+      return Colors.textSecondary;
+  }
 };
 
-export const ProgramDetail: React.FC<ProgramDetailProps> = ({ program: initialProgram, onBack }) => {
+const DetailMetric: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}> = ({ icon, label, value }) => (
+  <View
+    style={{
+      flex: 1,
+      minWidth: 180,
+      padding: Spacing.lg,
+      borderRadius: Radii.md,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      backgroundColor: Colors.surfaceCard,
+    }}
+  >
+    <View style={{ marginBottom: Spacing.md }}>{icon}</View>
+    <Text
+      style={{
+        ...Type.eyebrow,
+        fontSize: 10,
+        color: Colors.textTertiary,
+      }}
+    >
+      {label}
+    </Text>
+    <Text
+      style={{
+        ...Type.bodyStrong,
+        color: Colors.textPrimary,
+        marginTop: Spacing.xs,
+      }}
+    >
+      {value}
+    </Text>
+  </View>
+);
+
+export const ProgramDetail: React.FC<ProgramDetailProps> = ({
+  program: initialProgram,
+  onBack,
+}) => {
   const [program, setProgram] = useState(initialProgram);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    dataProvider.getProgramById(initialProgram.id)
-      .then(detail => { if (detail) setProgram(detail); })
-      .catch(error => Toast.show({ type: 'error', text1: 'Unable to load program details', text2: error?.message || 'Try again.' }))
+    dataProvider
+      .getProgramById(initialProgram.id)
+      .then((detail) => {
+        if (detail) setProgram(detail);
+      })
+      .catch((error) =>
+        Toast.show({
+          type: "error",
+          text1: "Unable to load program details",
+          text2: error?.message || "Try again.",
+        }),
+      )
       .finally(() => setLoading(false));
   }, [initialProgram.id]);
 
   const members = program.teamMembers || [];
-  const status = program.status.replace('_', ' ').toUpperCase();
+  const status = program.status.replace(/_/g, " ").toUpperCase();
+  const statusColor = getStatusColor(program.status);
 
   return (
-    <ScrollView className="flex-1 bg-[#F4F6F7]" contentContainerClassName="pb-12">
-      <View className="mx-auto w-full max-w-[1180px] px-5 py-6 md:px-10 md:py-9">
-        <TouchableOpacity onPress={onBack} className="mb-7 flex-row items-center gap-2 self-start">
-          <View className="rounded-lg border border-[#D7E1E4] bg-white p-2"><ArrowLeft size={17} color={Colors.primary} /></View>
-          <Text className="text-sm font-bold text-[#294D55]">Back to workspace</Text>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: Colors.surface }}
+      contentContainerStyle={{ paddingBottom: Spacing["5xl"] }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 1180,
+          alignSelf: "center",
+          paddingHorizontal: Spacing.xl,
+          paddingTop: Spacing["2xl"],
+          paddingBottom: Spacing["3xl"],
+        }}
+      >
+        {/* Back Button */}
+        <TouchableOpacity
+          onPress={onBack}
+          style={{
+            marginBottom: Spacing["2xl"],
+            flexDirection: "row",
+            alignItems: "center",
+            gap: Spacing.sm,
+            alignSelf: "flex-start",
+          }}
+        >
+          <View
+            style={{
+              padding: Spacing.sm,
+              borderRadius: Radii.md,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              backgroundColor: Colors.surfaceInput,
+            }}
+          >
+            <ArrowLeft size={17} color={Colors.accent} />
+          </View>
+          <Text
+            style={{
+              ...Type.caption,
+              fontWeight: "700",
+              color: Colors.textSecondary,
+            }}
+          >
+            Back to workspace
+          </Text>
         </TouchableOpacity>
 
-        <View className="mb-6 flex-row flex-wrap items-start justify-between gap-5">
-          <View className="min-w-0 flex-1">
-            <Text className="mb-2 text-[11px] font-bold uppercase tracking-[2px] text-[#2D766D]">PROGRAM / FIELD DETAIL</Text>
-            <Text className="text-3xl font-black tracking-[-1px] text-[#152A35] md:text-4xl">{program.programName}</Text>
-            <View className="mt-3 flex-row items-center gap-2"><MapPin size={15} color="#71838A" /><Text className="text-sm text-[#71838A]">{program.hatcheryOrFarmName}</Text></View>
+        {/* Header */}
+        <View
+          style={{
+            marginBottom: Spacing["2xl"],
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: Spacing.lg,
+          }}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={{
+                ...Type.eyebrow,
+                color: Colors.accent,
+                marginBottom: Spacing.sm,
+              }}
+            >
+              PROGRAM / FIELD DETAIL
+            </Text>
+            <Text style={{ ...Type.h1, color: Colors.textPrimary }}>
+              {program.programName}
+            </Text>
+            <View
+              style={{
+                marginTop: Spacing.md,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: Spacing.sm,
+              }}
+            >
+              <MapPin size={15} color={Colors.textTertiary} />
+              <Text style={{ ...Type.caption, color: Colors.textSecondary }}>
+                {program.hatcheryOrFarmName}
+              </Text>
+            </View>
           </View>
-          <View className="rounded-lg border px-3 py-2" style={{ borderColor: `${statusColors[program.status]}40`, backgroundColor: `${statusColors[program.status]}12` }}>
-            <Text className="text-[11px] font-black tracking-wide" style={{ color: statusColors[program.status] }}>{status}</Text>
+          <View
+            style={{
+              paddingHorizontal: Spacing.md,
+              paddingVertical: Spacing.sm,
+              borderRadius: Radii.md,
+              borderWidth: 1,
+              borderColor: `${statusColor}55`,
+              backgroundColor: `${statusColor}1A`,
+            }}
+          >
+            <Text
+              style={{
+                ...Type.eyebrow,
+                fontSize: 10,
+                color: statusColor,
+              }}
+            >
+              {status}
+            </Text>
           </View>
         </View>
 
-        <View className="mb-5 flex-row flex-wrap gap-3">
-          <DetailMetric icon={<Users size={17} color="#2D766D" />} label="Flock size" value={`${program.flockSize.toLocaleString()} birds`} />
-          <DetailMetric icon={<CalendarDays size={17} color="#4B71A4" />} label="Schedule" value={program.scheduledStartDate} />
-          <DetailMetric icon={<Clock3 size={17} color="#AF741A" />} label="Window" value={`${program.scheduledStartTime} - ${program.scheduledEndTime}`} />
+        {/* Metrics Row */}
+        <View
+          style={{
+            marginBottom: Spacing.xl,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: Spacing.md,
+          }}
+        >
+          <DetailMetric
+            icon={<Users size={17} color={Colors.accent} />}
+            label="Flock size"
+            value={`${program.flockSize.toLocaleString()} birds`}
+          />
+          <DetailMetric
+            icon={<CalendarDays size={17} color={Colors.info} />}
+            label="Schedule"
+            value={program.scheduledStartDate}
+          />
+          <DetailMetric
+            icon={<Clock3 size={17} color={Colors.warning} />}
+            label="Window"
+            value={`${program.scheduledStartTime} - ${program.scheduledEndTime}`}
+          />
         </View>
 
-        <View className="flex-row flex-wrap items-start gap-5">
-          <View className="min-w-0 flex-1 gap-5 md:min-w-[520px]">
-            <View className="rounded-2xl border border-[#DCE4E7] bg-white p-5 md:p-6">
-              <View className="mb-5 flex-row items-center gap-3"><View className="rounded-lg bg-[#EFF5F3] p-2"><Users size={18} color="#2D766D" /></View><View><Text className="text-base font-black text-[#152A35]">Assigned team</Text><Text className="mt-1 text-xs text-[#8A989C]">{members.length} people assigned to this program</Text></View></View>
-              {loading ? <ActivityIndicator color={Colors.primary} /> : members.length === 0 ? <Text className="py-8 text-center text-sm text-[#8A989C]">No team members are assigned.</Text> : members.map(member => (
-                <View key={member.id} className="flex-row items-center gap-3 border-t border-[#EDF0F1] py-3.5">
-                  <View className="h-9 w-9 items-center justify-center rounded-full bg-[#DFF0EA]"><Text className="text-xs font-black text-[#2D766D]">{member.fullName.split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase()}</Text></View>
-                  <View className="min-w-0 flex-1"><Text className="text-sm font-bold text-[#29434D]">{member.fullName}</Text><Text className="mt-0.5 text-xs text-[#8A989C]">{member.employeeCode || member.email}</Text></View>
-                  <Text className="text-[10px] font-bold uppercase tracking-wide text-[#71838A]">{member.role.replace('_', ' ')}</Text>
+        {/* Main Content Layout */}
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            gap: Spacing.lg,
+          }}
+        >
+          {/* Left Column */}
+          <View style={{ flex: 1, minWidth: 320, gap: Spacing.lg }}>
+            {/* Assigned Team */}
+            <View
+              style={{
+                padding: Spacing.xl,
+                borderRadius: Radii.lg,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surfaceCard,
+              }}
+            >
+              <View
+                style={{
+                  marginBottom: Spacing.lg,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: Spacing.md,
+                }}
+              >
+                <View
+                  style={{
+                    padding: Spacing.sm,
+                    borderRadius: Radii.sm,
+                    backgroundColor: Colors.accentSubtle,
+                    borderWidth: 1,
+                    borderColor: Colors.accentBorder,
+                  }}
+                >
+                  <Users size={18} color={Colors.accent} />
                 </View>
+                <View>
+                  <Text style={{ ...Type.h3, color: Colors.textPrimary }}>
+                    Assigned team
+                  </Text>
+                  <Text
+                    style={{
+                      ...Type.caption,
+                      color: Colors.textSecondary,
+                      marginTop: Spacing.xs,
+                    }}
+                  >
+                    {members.length} people assigned to this program
+                  </Text>
+                </View>
+              </View>
+
+              {loading ? (
+                <ActivityIndicator color={Colors.accent} />
+              ) : members.length === 0 ? (
+                <Text
+                  style={{
+                    ...Type.caption,
+                    color: Colors.textTertiary,
+                    textAlign: "center",
+                    paddingVertical: Spacing["3xl"],
+                  }}
+                >
+                  No team members are assigned.
+                </Text>
+              ) : (
+                members.map((member) => (
+                  <View
+                    key={member.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: Spacing.md,
+                      borderTopWidth: 1,
+                      borderTopColor: Colors.borderSubtle,
+                      paddingVertical: Spacing.md,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: Radii.pill,
+                        backgroundColor: Colors.accentSubtle,
+                        borderWidth: 1,
+                        borderColor: Colors.accentBorder,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          ...Type.eyebrow,
+                          fontSize: 10,
+                          color: Colors.accent,
+                        }}
+                      >
+                        {member.fullName
+                          .split(/\s+/)
+                          .map((part) => part[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{
+                          ...Type.bodyStrong,
+                          color: Colors.textPrimary,
+                        }}
+                      >
+                        {member.fullName}
+                      </Text>
+                      <Text
+                        style={{
+                          ...Type.caption,
+                          color: Colors.textTertiary,
+                          marginTop: 2,
+                        }}
+                      >
+                        {member.employeeCode || member.email}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        ...Type.eyebrow,
+                        fontSize: 9,
+                        color: Colors.textSecondary,
+                      }}
+                    >
+                      {member.role.replace(/_/g, " ")}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Program Notes */}
+            <View
+              style={{
+                padding: Spacing.xl,
+                borderRadius: Radii.lg,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surfaceCard,
+              }}
+            >
+              <Text
+                style={{
+                  ...Type.h3,
+                  color: Colors.textPrimary,
+                  marginBottom: Spacing.md,
+                }}
+              >
+                Program notes
+              </Text>
+              <Text
+                style={{
+                  ...Type.body,
+                  color: Colors.textSecondary,
+                  lineHeight: 24,
+                }}
+              >
+                {program.controllerRemarks ||
+                  "No operational notes have been added to this program."}
+              </Text>
+            </View>
+          </View>
+
+          {/* Right Column */}
+          <View style={{ width: 340, maxWidth: "100%", gap: Spacing.lg }}>
+            {/* Control Card */}
+            <View
+              style={{
+                padding: Spacing.xl,
+                borderRadius: Radii.lg,
+                backgroundColor: Colors.surfaceElevated,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <View
+                style={{
+                  marginBottom: Spacing.lg,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: Spacing.sm,
+                }}
+              >
+                <ShieldCheck size={18} color={Colors.accent} />
+                <Text
+                  style={{
+                    ...Type.eyebrow,
+                    fontSize: 10,
+                    color: Colors.accent,
+                  }}
+                >
+                  PROGRAM CONTROL
+                </Text>
+              </View>
+
+              <Text
+                style={{
+                  ...Type.eyebrow,
+                  fontSize: 9,
+                  color: Colors.textTertiary,
+                }}
+              >
+                CONTROLLER
+              </Text>
+              <Text
+                style={{
+                  ...Type.bodyStrong,
+                  color: Colors.textPrimary,
+                  marginTop: Spacing.xs,
+                }}
+              >
+                {program.controllerName || "Unassigned"}
+              </Text>
+
+              <Text
+                style={{
+                  ...Type.eyebrow,
+                  fontSize: 9,
+                  color: Colors.textTertiary,
+                  marginTop: Spacing.lg,
+                }}
+              >
+                AUDITOR
+              </Text>
+              <Text
+                style={{
+                  ...Type.bodyStrong,
+                  color: Colors.textPrimary,
+                  marginTop: Spacing.xs,
+                }}
+              >
+                {program.auditorName || "Not assigned"}
+              </Text>
+            </View>
+
+            {/* Vaccines Card */}
+            <View
+              style={{
+                padding: Spacing.xl,
+                borderRadius: Radii.lg,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surfaceCard,
+              }}
+            >
+              <View
+                style={{
+                  marginBottom: Spacing.md,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: Spacing.sm,
+                }}
+              >
+                <CheckCircle2 size={17} color={Colors.success} />
+                <Text style={{ ...Type.h3, color: Colors.textPrimary }}>
+                  Vaccines
+                </Text>
+              </View>
+              {(program.vaccinesUsed || ["Not specified"]).map((vaccine) => (
+                <Text
+                  key={vaccine}
+                  style={{
+                    ...Type.body,
+                    color: Colors.textSecondary,
+                    borderTopWidth: 1,
+                    borderTopColor: Colors.borderSubtle,
+                    paddingVertical: Spacing.md,
+                  }}
+                >
+                  {vaccine}
+                </Text>
               ))}
             </View>
-            <View className="rounded-2xl border border-[#DCE4E7] bg-white p-5 md:p-6">
-              <Text className="mb-4 text-base font-black text-[#152A35]">Program notes</Text>
-              <Text className="text-sm leading-6 text-[#71838A]">{program.controllerRemarks || 'No operational notes have been added to this program.'}</Text>
-            </View>
-          </View>
-          <View className="w-full gap-5 md:w-[340px]">
-            <View className="rounded-2xl bg-[#152A35] p-5"><View className="mb-5 flex-row items-center gap-2"><ShieldCheck size={18} color="#8FE2BE" /><Text className="text-xs font-bold text-[#B9D8D5]">PROGRAM CONTROL</Text></View><Text className="text-xs text-[#8FA8AC]">CONTROLLER</Text><Text className="mt-1 text-sm font-bold text-white">{program.controllerName || 'Unassigned'}</Text><Text className="mt-5 text-xs text-[#8FA8AC]">AUDITOR</Text><Text className="mt-1 text-sm font-bold text-white">{program.auditorName || 'Not assigned'}</Text></View>
-            <View className="rounded-2xl border border-[#DCE4E7] bg-white p-5"><View className="mb-4 flex-row items-center gap-2"><CheckCircle2 size={17} color="#397A61" /><Text className="text-sm font-black text-[#152A35]">Vaccines</Text></View>{(program.vaccinesUsed || ['Not specified']).map(vaccine => <Text key={vaccine} className="border-t border-[#EDF0F1] py-3 text-sm text-[#71838A]">{vaccine}</Text>)}</View>
           </View>
         </View>
       </View>
     </ScrollView>
   );
 };
-
-const DetailMetric: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <View className="min-w-[180px] flex-1 rounded-xl border border-[#DCE4E7] bg-white p-4"><View className="mb-3">{icon}</View><Text className="text-[11px] font-bold uppercase tracking-wide text-[#8A989C]">{label}</Text><Text className="mt-1 text-sm font-black text-[#29434D]">{value}</Text></View>
-);

@@ -1,179 +1,498 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Text, View, useWindowDimensions } from "react-native";
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  LinearGradient,
+  Path,
+  Rect,
+  Stop,
+} from "react-native-svg";
 import { MarushLogo } from "../components/MarushLogo";
-import { Colors } from "../constants/colors";
+import { Colors, Motion, Spacing, Type } from "../constants/design";
 
-interface LaunchScreenProps {
-  onFinishLaunch: () => void;
-}
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
-const PARTICLES = [
-  { size: 7, x: -74, y: -58, delay: 0 },
-  { size: 5, x: 72, y: -66, delay: 90 },
-  { size: 8, x: 82, y: 25, delay: 160 },
-  { size: 4, x: -86, y: 34, delay: 230 },
-  { size: 5, x: 42, y: 72, delay: 300 },
-  { size: 6, x: -40, y: 76, delay: 370 },
-];
+/* ECG-style path. Two peaks, mirrored. */
+const PATH_D =
+  "M0 100 L70 100 L88 58 L106 142 L124 100 L196 100 L210 82 L224 118 L238 100 L400 100";
 
-export const LaunchScreen: React.FC<LaunchScreenProps> = ({
+/* Peak positions along the path (approx x) for burst rings */
+const PEAKS = [88, 106, 210, 224];
+
+export const LaunchScreen: React.FC<{ onFinishLaunch: () => void }> = ({
   onFinishLaunch,
 }) => {
   const { width, height } = useWindowDimensions();
-  const sweepX = useRef(new Animated.Value(-width * 1.4)).current;
-  const sweepY = useRef(new Animated.Value(height * 1.4)).current;
+
+  // Grid & baseline
+  const gridOpacity = useRef(new Animated.Value(0)).current;
+  const baselineDraw = useRef(new Animated.Value(0)).current;
+
+  // Main pulse
+  const draw = useRef(new Animated.Value(0)).current;
+  const headProgress = useRef(new Animated.Value(0)).current;
+
+  // Peak bursts
+  const burstProgress = useRef(PEAKS.map(() => new Animated.Value(0))).current;
+
+  // Ambient glow
+  const glowOpacity = useRef(new Animated.Value(0)).current;
+  const glowScale = useRef(new Animated.Value(0.7)).current;
+
+  // Logo
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.92)).current;
+  const logoScale = useRef(new Animated.Value(0.94)).current;
+  const logoY = useRef(new Animated.Value(10)).current;
+  const ringScale = useRef(new Animated.Value(0.6)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
+
+  // Tagline
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+
+  // Footer rule
+  const footerRuleWidth = useRef(new Animated.Value(0)).current;
+  const footerOpacity = useRef(new Animated.Value(0)).current;
+
+  // Exit
+  const exitScale = useRef(new Animated.Value(1)).current;
   const exitOpacity = useRef(new Animated.Value(1)).current;
-  const particleProgress = useRef(
-    PARTICLES.map(() => new Animated.Value(0)),
-  ).current;
 
   useEffect(() => {
-    const particleAnimations = particleProgress.map((progress, index) =>
+    const burstAnims = burstProgress.map((p, i) =>
       Animated.sequence([
-        Animated.delay(PARTICLES[index].delay),
-        Animated.timing(progress, {
+        Animated.delay(120 + i * 40),
+        Animated.timing(p, {
           toValue: 1,
           duration: 620,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]),
     );
 
     Animated.sequence([
+      /* 1 ── Grid paper fades in (blueprint backdrop) */
+      Animated.timing(gridOpacity, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+
+      /* 2 ── Baseline draws left→right (the "reference" ECG trace) */
       Animated.parallel([
-        Animated.timing(sweepX, {
-          toValue: width * 1.6,
-          duration: 1350,
+        Animated.timing(baselineDraw, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowOpacity, {
+          toValue: 1,
+          duration: 700,
           useNativeDriver: true,
         }),
-        Animated.timing(sweepY, {
-          toValue: -height * 1.6,
-          duration: 1350,
+        Animated.timing(glowScale, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]),
+
+      /* 3 ── The live pulse draws in, head dot rides along, peaks burst */
       Animated.parallel([
-        Animated.timing(logoOpacity, {
+        Animated.timing(draw, {
           toValue: 1,
-          duration: 350,
+          duration: 950,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(headProgress, {
+          toValue: 1,
+          duration: 950,
+          easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.spring(logoScale, {
-          toValue: 1,
-          friction: 6,
-          tension: 55,
-          useNativeDriver: true,
-        }),
+        ...burstAnims,
       ]),
+
+      /* 4 ── Logo reveal: ring expands, then logo lifts in */
       Animated.parallel([
-        ...particleAnimations,
         Animated.sequence([
-          Animated.delay(760),
-          Animated.timing(exitOpacity, {
-            toValue: 0,
-            duration: 360,
+          Animated.timing(ringOpacity, {
+            toValue: 1,
+            duration: 200,
             useNativeDriver: true,
           }),
+          Animated.parallel([
+            Animated.timing(ringScale, {
+              toValue: 2.4,
+              duration: 700,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(ringOpacity, {
+              toValue: 0,
+              duration: 700,
+              useNativeDriver: true,
+            }),
+          ]),
         ]),
+        Animated.sequence([
+          Animated.delay(120),
+          Animated.parallel([
+            Animated.timing(logoOpacity, {
+              toValue: 1,
+              duration: 380,
+              useNativeDriver: true,
+            }),
+            Animated.spring(logoScale, {
+              toValue: 1,
+              friction: Motion.spring.friction,
+              tension: Motion.spring.tension,
+              useNativeDriver: true,
+            }),
+            Animated.timing(logoY, {
+              toValue: 0,
+              duration: 420,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
+      ]),
+
+      /* 5 ── Tagline + footer rule */
+      Animated.parallel([
+        Animated.timing(taglineOpacity, {
+          toValue: 1,
+          duration: 320,
+          useNativeDriver: true,
+        }),
+        Animated.timing(footerRuleWidth, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(footerOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
+
+      /* 6 ── Hold, then zoom-fade out */
+      Animated.delay(800),
+      Animated.parallel([
+        Animated.timing(exitOpacity, {
+          toValue: 0,
+          duration: 420,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(exitScale, {
+          toValue: 1.04,
+          duration: 420,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
       ]),
     ]).start(() => onFinishLaunch());
 
     return () => {
-      sweepX.stopAnimation();
-      sweepY.stopAnimation();
-      logoOpacity.stopAnimation();
-      logoScale.stopAnimation();
-      exitOpacity.stopAnimation();
-      particleProgress.forEach((progress) => progress.stopAnimation());
+      [
+        gridOpacity,
+        baselineDraw,
+        draw,
+        headProgress,
+        glowOpacity,
+        glowScale,
+        logoOpacity,
+        logoScale,
+        logoY,
+        ringScale,
+        ringOpacity,
+        taglineOpacity,
+        footerRuleWidth,
+        footerOpacity,
+        exitScale,
+        exitOpacity,
+      ].forEach((v) => v.stopAnimation());
+      burstProgress.forEach((p) => p.stopAnimation());
     };
-  }, [
-    exitOpacity,
-    height,
-    logoOpacity,
-    logoScale,
-    onFinishLaunch,
-    particleProgress,
-    sweepX,
-    sweepY,
-    width,
-  ]);
+  }, []);
+
+  const pathTop = height / 2 - 100;
+  const pathWidth = width;
+  const headX = headProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, pathWidth],
+  });
+  // The head follows the y of the path — approximate by interpolating peaks
+  const headY = headProgress.interpolate({
+    inputRange: [0, 0.22, 0.265, 0.31, 0.49, 0.525, 0.56, 1],
+    outputRange: [100, 100, 58, 142, 100, 82, 118, 100],
+  });
 
   return (
     <Animated.View
-      className="flex-1 items-center justify-center overflow-hidden bg-[#e9f7f5]"
-      style={{ opacity: exitOpacity }}
+      style={{
+        flex: 1,
+        backgroundColor: Colors.surface,
+        opacity: exitOpacity,
+        transform: [{ scale: exitScale }],
+      }}
     >
+      {/* ───────────── Ambient glow (behind everything) ───────────── */}
       <Animated.View
-        className="absolute h-[260%] w-[220%] bg-marush-primary"
+        pointerEvents="none"
         style={{
-          transform: [
-            { translateX: sweepX },
-            { translateY: sweepY },
-            { rotate: "-45deg" },
-          ],
+          position: "absolute",
+          top: height / 2 - 260,
+          left: width / 2 - 260,
+          width: 520,
+          height: 520,
+          borderRadius: 260,
+          backgroundColor: Colors.accent,
+          opacity: glowOpacity.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.07],
+          }),
+          transform: [{ scale: glowScale }],
         }}
       />
-      <View className="absolute h-64 w-64 rounded-full bg-marush-secondary/10" />
 
+      {/* ───────────── Grid paper ───────────── */}
       <Animated.View
-        className="items-center justify-center"
-        style={{
-          opacity: logoOpacity,
-          transform: [{ scale: logoScale }],
-        }}
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { opacity: gridOpacity }]}
       >
-        <MarushLogo size="lg" variant="mark" />
-        <Text className="mt-5 text-xl font-extrabold tracking-[3px] text-marush-primary">
-          MARUSH
-        </Text>
-        <Text className="mt-1 text-[10px] font-bold uppercase tracking-[1.8px] text-marush-secondary-dark">
-          Field operations
-        </Text>
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={Colors.white} stopOpacity="0.02" />
+              <Stop offset="0.5" stopColor={Colors.white} stopOpacity="0.06" />
+              <Stop offset="1" stopColor={Colors.white} stopOpacity="0.02" />
+            </LinearGradient>
+          </Defs>
+          {Array.from({ length: 14 }).map((_, i) => (
+            <Rect
+              key={`h${i}`}
+              x="0"
+              y={(height / 14) * i}
+              width={width}
+              height="1"
+              fill="url(#gridFade)"
+            />
+          ))}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Rect
+              key={`v${i}`}
+              x={(width / 8) * i}
+              y="0"
+              width="1"
+              height={height}
+              fill="url(#gridFade)"
+            />
+          ))}
+        </Svg>
       </Animated.View>
 
-      {PARTICLES.map((particle, index) => {
-        const progress = particleProgress[index];
-        return (
-          <Animated.View
-            key={`${particle.x}-${particle.y}`}
-            className="absolute rounded-full"
-            style={{
-              left: width / 2 - particle.size / 2,
-              top: height / 2 - particle.size / 2,
-              width: particle.size,
-              height: particle.size,
-              backgroundColor:
-                index % 2 === 0 ? Colors.secondary : Colors.primaryLight,
-              opacity: progress.interpolate({
-                inputRange: [0, 0.2, 1],
-                outputRange: [0, 1, 0],
-              }),
-              transform: [
-                {
-                  translateX: progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, particle.x],
-                  }),
-                },
-                {
-                  translateY: progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, particle.y],
-                  }),
-                },
-                {
-                  scale: progress.interpolate({
-                    inputRange: [0, 0.25, 1],
-                    outputRange: [0.3, 1, 0.6],
-                  }),
-                },
-              ],
-            }}
+      {/* ───────────── ECG trace area ───────────── */}
+      <View
+        style={{
+          position: "absolute",
+          top: pathTop,
+          left: 0,
+          width: width,
+          height: 200,
+        }}
+      >
+        <Svg width={width} height={200} viewBox={`0 0 ${width} 200`}>
+          <Defs>
+            <LinearGradient id="pulseGrad" x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0" stopColor={Colors.accent} stopOpacity="0" />
+              <Stop offset="0.5" stopColor={Colors.accent} stopOpacity="0.85" />
+              <Stop offset="1" stopColor={Colors.accent} stopOpacity="0" />
+            </LinearGradient>
+            <LinearGradient id="baselineGrad" x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0" stopColor={Colors.white} stopOpacity="0" />
+              <Stop offset="0.5" stopColor={Colors.white} stopOpacity="0.12" />
+              <Stop offset="1" stopColor={Colors.white} stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+
+          {/* Baseline (static reference trace) */}
+          <AnimatedPath
+            d={PATH_D}
+            stroke="url(#baselineGrad)"
+            strokeWidth="1"
+            fill="none"
+            strokeDasharray="1000"
+            strokeDashoffset={baselineDraw.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1000, 0],
+            })}
+            transform={`scale(${width / 400} 1)`}
           />
-        );
-      })}
+
+          {/* Live pulse trace */}
+          <AnimatedPath
+            d={PATH_D}
+            stroke="url(#pulseGrad)"
+            strokeWidth="2"
+            fill="none"
+            strokeDasharray="1000"
+            strokeDashoffset={draw.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1000, 0],
+            })}
+            transform={`scale(${width / 400} 1)`}
+          />
+
+          {/* Peak bursts (expanding rings at each spike) */}
+          {PEAKS.map((px, i) => {
+            const scaledX = (px / 400) * width;
+            return (
+              <AnimatedCircle
+                key={i}
+                cx={scaledX}
+                cy={i < 2 ? 58 : 82}
+                r={burstProgress[i].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 14],
+                })}
+                stroke={Colors.accent}
+                strokeWidth="1.2"
+                fill="none"
+                opacity={burstProgress[i].interpolate({
+                  inputRange: [0, 0.2, 1],
+                  outputRange: [0, 0.9, 0],
+                })}
+              />
+            );
+          })}
+
+          {/* Glowing head that rides the pulse */}
+          <G>
+            <AnimatedCircle
+              cx={headX}
+              cy={headY}
+              r="10"
+              fill={Colors.accent}
+              opacity={headProgress.interpolate({
+                inputRange: [0, 0.02, 0.95, 1],
+                outputRange: [0, 0.25, 0.25, 0],
+              })}
+            />
+            <AnimatedCircle
+              cx={headX}
+              cy={headY}
+              r="4"
+              fill={Colors.white}
+              opacity={headProgress.interpolate({
+                inputRange: [0, 0.02, 0.95, 1],
+                outputRange: [0, 1, 1, 0],
+              })}
+            />
+          </G>
+        </Svg>
+      </View>
+
+      {/* ───────────── Logo + ring + wordmark ───────────── */}
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Animated.View
+          style={{
+            position: "absolute",
+            width: 140,
+            height: 140,
+            borderRadius: 70,
+            borderWidth: 1.5,
+            borderColor: Colors.accent,
+            opacity: ringOpacity,
+            transform: [{ scale: ringScale }],
+          }}
+        />
+
+        <Animated.View
+          style={{
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }, { translateY: logoY }],
+          }}
+        >
+          <MarushLogo size="lg" variant="mark" theme="dark" framed={false} />
+        </Animated.View>
+
+        <Animated.Text
+          style={{
+            opacity: taglineOpacity,
+            marginTop: Spacing["2xl"] - 2,
+            ...Type.eyebrow,
+            fontSize: 10,
+            letterSpacing: 3.2,
+            color: Colors.accent,
+          }}
+        >
+          Cold Chain Integrity
+        </Animated.Text>
+      </View>
+
+      {/* ───────────── Footer ───────────── */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          bottom: Spacing["5xl"] - 12,
+          left: 0,
+          right: 0,
+          alignItems: "center",
+          opacity: footerOpacity,
+        }}
+      >
+        {/* Draw-in rule */}
+        <Animated.View
+          style={{
+            height: 1,
+            width: footerRuleWidth.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 120],
+            }),
+            backgroundColor: Colors.accent,
+            opacity: 0.5,
+            marginBottom: Spacing.md,
+          }}
+        />
+        <Text
+          style={{
+            fontSize: 9,
+            fontWeight: "600",
+            letterSpacing: 1.6,
+            color: Colors.textSecondary,
+            textTransform: "uppercase",
+          }}
+        >
+          CEVA's Exclusive Distributor in Pakistan
+        </Text>
+      </Animated.View>
     </Animated.View>
   );
 };

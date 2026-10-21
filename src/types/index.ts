@@ -11,10 +11,11 @@ export type ProgramStatus = 'draft' | 'pending_approval' | 'active' | 'pending_a
 export interface UserProfile {
   id: string;
   authUserId?: string;
-  email: string;
+  email?: string;
   fullName: string;
   role: UserRole;
   isSuperAdmin?: boolean;
+  isDeveloper?: boolean;
   requestedRole?: UserRole;
   status: UserStatus;
   phone?: string;
@@ -167,10 +168,11 @@ export interface Database {
         Row: {
           id: string;
           auth_user_id: string | null;
-          email: string;
+          email?: string | null;
           full_name: string;
           role: UserRole;
           is_super_admin: boolean;
+          is_developer: boolean;
           requested_role: UserRole | null;
           status: UserStatus;
           phone: string | null;
@@ -182,10 +184,11 @@ export interface Database {
         Insert: {
           id?: string;
           auth_user_id?: string | null;
-          email: string;
+          email?: string | null;
           full_name: string;
           role?: UserRole;
           is_super_admin?: boolean;
+          is_developer?: boolean;
           requested_role?: UserRole | null;
           status?: UserStatus;
           phone?: string | null;
@@ -197,10 +200,11 @@ export interface Database {
         Update: {
           id?: string;
           auth_user_id?: string | null;
-          email?: string;
+          email?: string | null;
           full_name?: string;
           role?: UserRole;
           is_super_admin?: boolean;
+          is_developer?: boolean;
           requested_role?: UserRole | null;
           status?: UserStatus;
           phone?: string | null;

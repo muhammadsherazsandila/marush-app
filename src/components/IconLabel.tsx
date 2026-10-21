@@ -1,6 +1,6 @@
-import React from 'react';
-import { Text, View } from 'react-native';
-import { Colors } from '../constants/colors';
+import React from "react";
+import { Text, View } from "react-native";
+import { Colors, Spacing } from "../constants/design";
 
 type IconComponent = React.ComponentType<{
   size?: number;
@@ -13,19 +13,36 @@ interface IconLabelProps {
   label: string;
   color?: string;
   size?: number;
-  className?: string;
+  className?: string; // Kept for backward compatibility, but ignored
 }
 
 export const IconLabel: React.FC<IconLabelProps> = ({
   icon: Icon,
   label,
-  color = Colors.primary,
+  color = Colors.accent, // Changed default from primary (forest) to accent (cerulean)
   size = 16,
   className,
 }) => (
-  <View className="flex-row items-center justify-center gap-2">
+  <View
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: Spacing.sm,
+    }}
+  >
     <Icon size={size} color={color} strokeWidth={2} />
-    <Text className={className}>{label}</Text>
+    <Text
+      style={{
+        // If you have standard text colors you want to enforce here, you can,
+        // but usually this takes a className from the parent. Since we are
+        // moving away from Tailwind classes, I've set a default text color.
+        color: Colors.textSecondary,
+        fontWeight: "500",
+        fontSize: 13,
+      }}
+    >
+      {label}
+    </Text>
   </View>
 );
-
